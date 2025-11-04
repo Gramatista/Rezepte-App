@@ -1,0 +1,2935 @@
+<!doctype html>
+<html lang="de">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mein Kochbuch</title>
+  <script src="/_sdk/data_sdk.js"></script>
+  <script src="/_sdk/element_sdk.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <style>
+        body {
+            box-sizing: border-box;
+        }
+        
+        .recipe-card {
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .recipe-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        }
+        
+        .meal-slot {
+            min-height: 80px;
+            border: 2px dashed #d1d5db;
+            transition: all 0.2s;
+        }
+        
+        .meal-slot.drag-over {
+            border-color: #f59e0b;
+            background-color: #fef3c7;
+        }
+        
+        .dragging {
+            opacity: 0.5;
+        }
+        
+        .calendar-day {
+            min-height: 200px;
+        }
+        
+        .shopping-item {
+            transition: all 0.2s;
+        }
+        
+        .shopping-item.checked {
+            opacity: 0.6;
+            text-decoration: line-through;
+        }
+    </style>
+  <style>@view-transition { navigation: auto; }</style>
+ </head>
+ <body class="min-h-full bg-orange-50">
+  <div id="app" class="min-h-full"><!-- Navigation -->
+   <nav class="bg-orange-600 text-white shadow-lg">
+    <div class="max-w-7xl mx-auto px-4">
+     <div class="flex justify-between items-center h-16">
+      <h1 id="app-title" class="text-xl font-bold">Mein Kochbuch</h1>
+      <div class="flex space-x-4"><button onclick="showSection('recipes')" class="nav-btn px-4 py-2 rounded hover:bg-orange-700 transition-colors">Rezepte</button> <button onclick="showSection('stores')" class="nav-btn px-4 py-2 rounded hover:bg-orange-700 transition-colors">Geschäfte</button> <button onclick="showSection('mealplans')" class="nav-btn px-4 py-2 rounded hover:bg-orange-700 transition-colors">Essenspläne</button> <button onclick="startMealPlanningWorkflow()" class="nav-btn px-4 py-2 rounded hover:bg-orange-700 transition-colors bg-orange-700">Neuer Essensplan</button> <button onclick="showSection('shopping')" class="nav-btn px-4 py-2 rounded hover:bg-orange-700 transition-colors">Einkaufsliste</button>
+      </div>
+     </div>
+    </div>
+   </nav><!-- Welcome Section -->
+   <div id="welcome-section" class="max-w-7xl mx-auto px-4 py-8">
+    <div class="text-center">
+     <h2 id="welcome-message" class="text-3xl font-bold text-orange-800 mb-4">Willkommen in Ihrem digitalen Kochbuch!</h2>
+     <p class="text-orange-600 mb-8">Verwalten Sie Ihre Rezepte, planen Sie Ihre Mahlzeiten und erstellen Sie Einkaufslisten.</p>
+     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div class="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow cursor-pointer" onclick="showSection('recipes')">
+       <div class="text-4xl mb-4">
+        📖
+       </div>
+       <h3 class="text-lg font-semibold text-orange-800">Rezepte</h3>
+       <p class="text-orange-600">Erstellen und verwalten Sie Ihre Lieblingsrezepte</p>
+      </div>
+      <div class="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow cursor-pointer" onclick="showSection('stores')">
+       <div class="text-4xl mb-4">
+        🏪
+       </div>
+       <h3 class="text-lg font-semibold text-orange-800">Geschäfte</h3>
+       <p class="text-orange-600">Verwalten Sie Ihre Einkaufsquellen</p>
+      </div>
+      <div class="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow cursor-pointer" onclick="showSection('mealplans')">
+       <div class="text-4xl mb-4">
+        📅
+       </div>
+       <h3 class="text-lg font-semibold text-orange-800">Essenspläne</h3>
+       <p class="text-orange-600">Verwalten Sie Ihre Wochenpläne</p>
+      </div>
+      <div class="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow cursor-pointer" onclick="showSection('shopping')">
+       <div class="text-4xl mb-4">
+        🛒
+       </div>
+       <h3 class="text-lg font-semibold text-orange-800">Einkaufsliste</h3>
+       <p class="text-orange-600">Automatische Einkaufslisten basierend auf Ihrer Planung</p>
+      </div>
+     </div>
+    </div>
+   </div><!-- Recipes Section -->
+   <div id="recipes-section" class="hidden max-w-7xl mx-auto px-4 py-8">
+    <div class="flex justify-between items-center mb-6">
+     <h2 class="text-2xl font-bold text-orange-800">Meine Rezepte</h2><button onclick="showAddRecipeForm()" class="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition-colors">+ Neues Rezept</button>
+    </div><!-- Search and Filter -->
+    <div class="bg-white p-4 rounded-lg shadow-md mb-6">
+     <div class="grid grid-cols-1 md:grid-cols-3 gap-4"><input type="text" id="recipe-search" placeholder="Rezept suchen..." class="border border-orange-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500"> <select id="category-filter" class="border border-orange-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500"> <option value="">Alle Kategorien</option> </select> <input type="text" id="ingredient-filter" placeholder="Nach Zutat filtern..." class="border border-orange-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+     </div>
+    </div><!-- Recipe Grid -->
+    <div id="recipes-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"><!-- Recipes will be populated here -->
+    </div><!-- Add Recipe Form -->
+    <div id="add-recipe-form" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+     <div class="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-screen overflow-y-auto">
+      <h3 class="text-xl font-bold text-orange-800 mb-4">Neues Rezept hinzufügen</h3>
+      <form id="recipe-form">
+       <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4"><input type="text" id="recipe-title" placeholder="Rezept Titel" required class="border border-orange-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500"> <select id="recipe-category" required class="border border-orange-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500"> <option value="">Kategorie wählen</option> <option value="Vorspeise">Vorspeise</option> <option value="Hauptgericht">Hauptgericht</option> <option value="Nachspeise">Nachspeise</option> <option value="Snack">Snack</option> <option value="Getränk">Getränk</option> </select>
+       </div>
+       <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4"><input type="number" id="recipe-servings" placeholder="Portionen" min="1" required class="border border-orange-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500"> <input type="number" id="recipe-cooktime" placeholder="Kochzeit (Minuten)" min="1" required class="border border-orange-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+       </div><input type="text" id="recipe-tags" placeholder="Tags (durch Komma getrennt)" class="w-full border border-orange-200 rounded-lg px-3 py-2 mb-4 focus:outline-none focus:ring-2 focus:ring-orange-500"> <!-- Ingredients Section -->
+       <div class="mb-4"><label class="block text-sm font-medium text-orange-800 mb-2">Zutaten</label>
+        <div id="ingredients-container">
+         <div class="ingredient-row grid grid-cols-12 gap-2 mb-2"><input type="text" placeholder="Menge" class="col-span-2 border border-orange-200 rounded px-2 py-1 text-sm ingredient-quantity"> <input type="text" placeholder="Einheit" class="col-span-2 border border-orange-200 rounded px-2 py-1 text-sm ingredient-unit"> <input type="text" placeholder="Zutat" class="col-span-4 border border-orange-200 rounded px-2 py-1 text-sm ingredient-name"> <select class="col-span-3 border border-orange-200 rounded px-2 py-1 text-sm ingredient-stores" multiple> <!-- Stores will be populated --> </select> <button type="button" onclick="removeIngredient(this)" class="col-span-1 bg-red-500 text-white rounded px-2 py-1 text-sm hover:bg-red-600">×</button>
+         </div>
+        </div><button type="button" onclick="addIngredientRow()" class="bg-orange-500 text-white px-3 py-1 rounded text-sm hover:bg-orange-600">+ Zutat hinzufügen</button>
+       </div><textarea id="recipe-steps" placeholder="Zubereitungsschritte (einen Schritt pro Zeile)" rows="6" required class="w-full border border-orange-200 rounded-lg px-3 py-2 mb-4 focus:outline-none focus:ring-2 focus:ring-orange-500"></textarea>
+       <div class="flex justify-end space-x-4"><button type="button" onclick="hideAddRecipeForm()" class="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors">Abbrechen</button> <button type="submit" class="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition-colors">Rezept speichern</button>
+       </div>
+      </form>
+     </div>
+    </div><!-- Recipe Detail Modal -->
+    <div id="recipe-detail-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+     <div class="bg-white rounded-lg p-6 max-w-4xl w-full mx-4 max-h-screen overflow-y-auto">
+      <div id="recipe-detail-content"><!-- Recipe details will be populated here -->
+      </div>
+     </div>
+    </div>
+   </div><!-- Stores Section -->
+   <div id="stores-section" class="hidden max-w-7xl mx-auto px-4 py-8">
+    <div class="flex justify-between items-center mb-6">
+     <h2 class="text-2xl font-bold text-orange-800">Meine Geschäfte</h2><button onclick="showAddStoreForm()" class="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition-colors">+ Neues Geschäft</button>
+    </div>
+    <div id="stores-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"><!-- Stores will be populated here -->
+    </div><!-- Add Store Form -->
+    <div id="add-store-form" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+     <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+      <h3 class="text-xl font-bold text-orange-800 mb-4">Neues Geschäft hinzufügen</h3>
+      <form id="store-form"><input type="text" id="store-name" placeholder="Geschäftsname" required class="w-full border border-orange-200 rounded-lg px-3 py-2 mb-4 focus:outline-none focus:ring-2 focus:ring-orange-500"> <textarea id="store-address" placeholder="Adresse" rows="3" class="w-full border border-orange-200 rounded-lg px-3 py-2 mb-4 focus:outline-none focus:ring-2 focus:ring-orange-500"></textarea>
+       <div class="flex justify-end space-x-4"><button type="button" onclick="hideAddStoreForm()" class="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors">Abbrechen</button> <button type="submit" class="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition-colors">Geschäft speichern</button>
+       </div>
+      </form>
+     </div>
+    </div>
+   </div><!-- Meal Plans Section -->
+   <div id="mealplans-section" class="hidden max-w-7xl mx-auto px-4 py-8">
+    <div class="flex justify-between items-center mb-6">
+     <h2 class="text-2xl font-bold text-orange-800">Meine Essenspläne</h2><button onclick="startMealPlanningWorkflow()" class="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition-colors">+ Neuer Essensplan</button>
+    </div>
+    <div id="mealplans-grid" class="space-y-6"><!-- Meal plans will be populated here -->
+    </div><!-- Edit Warning Dialog -->
+    <div id="edit-warning-dialog" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+     <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+      <h3 class="text-xl font-bold text-orange-800 mb-4">⚠️ Warnung</h3>
+      <p class="text-orange-700 mb-4">Wenn Sie diesen Essensplan bearbeiten, werden alle zugehörigen Einkaufspläne gelöscht und müssen neu erstellt werden.</p>
+      <p class="text-sm text-orange-600 mb-6">Möchten Sie wirklich fortfahren?</p>
+      <div class="flex justify-end space-x-4"><button onclick="cancelEditWarning()" class="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600">Abbrechen</button> <button onclick="confirmEditWarning()" class="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700">Ja, bearbeiten</button>
+      </div>
+     </div>
+    </div>
+   </div><!-- Meal Planning Workflow Modal -->
+   <div id="meal-planning-workflow" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-lg p-6 max-w-4xl w-full mx-4 max-h-screen overflow-y-auto">
+     <div class="flex justify-between items-center mb-6">
+      <h2 class="text-2xl font-bold text-orange-800" id="workflow-title">Neuer Essensplan erstellen</h2><button onclick="closeMealPlanningWorkflow()" class="text-gray-500 hover:text-gray-700 text-2xl">×</button>
+     </div><!-- Step 1: Time Period Selection -->
+     <div id="workflow-step-1" class="workflow-step">
+      <h3 class="text-lg font-semibold text-orange-700 mb-4">Schritt 1: Zeitraum auswählen</h3>
+      <div class="mb-4"><label class="block text-sm font-medium text-orange-800 mb-2">Name des Essensplans:</label> <input type="text" id="meal-plan-name" placeholder="z.B. Wochenplan KW 3" required class="w-full border border-orange-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+       <div><label class="block text-sm font-medium text-orange-800 mb-2">Startdatum:</label> <input type="date" id="workflow-start-date" class="w-full border border-orange-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+       </div>
+       <div><label class="block text-sm font-medium text-orange-800 mb-2">Enddatum:</label> <input type="date" id="workflow-end-date" class="w-full border border-orange-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+       </div>
+      </div>
+      <div class="flex justify-end"><button onclick="proceedToStep2()" class="bg-orange-600 text-white px-6 py-2 rounded-lg hover:bg-orange-700">Weiter</button>
+      </div>
+     </div><!-- Step 2: Daily Meal Planning -->
+     <div id="workflow-step-2" class="workflow-step hidden">
+      <div class="flex justify-between items-center mb-4">
+       <h3 class="text-lg font-semibold text-orange-700">Schritt 2: Mahlzeiten planen</h3>
+       <div class="text-sm text-orange-600">
+        Tag <span id="current-day-number">1</span> von <span id="total-days">1</span>
+       </div>
+      </div>
+      <div class="bg-orange-50 p-4 rounded-lg mb-6">
+       <h4 class="font-medium text-orange-800 mb-2" id="current-date-display">Datum</h4>
+       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"><!-- Breakfast -->
+        <div class="bg-white p-4 rounded-lg">
+         <h5 class="font-medium text-orange-700 mb-3">Frühstück</h5>
+         <div id="breakfast-recipes" class="space-y-2 mb-3"><!-- Selected recipes will appear here -->
+         </div><button onclick="selectRecipeForMeal('Frühstück')" class="w-full bg-orange-500 text-white py-2 rounded hover:bg-orange-600 text-sm">+ Rezept hinzufügen</button>
+         <div class="mt-3 text-xs text-orange-600">
+          <div>
+           Benötigte Tags: <span id="breakfast-missing-tags" class="font-medium"></span>
+          </div>
+         </div>
+        </div><!-- Lunch -->
+        <div class="bg-white p-4 rounded-lg">
+         <h5 class="font-medium text-orange-700 mb-3">Mittagessen</h5>
+         <div id="lunch-recipes" class="space-y-2 mb-3"><!-- Selected recipes will appear here -->
+         </div><button onclick="selectRecipeForMeal('Mittagessen')" class="w-full bg-orange-500 text-white py-2 rounded hover:bg-orange-600 text-sm">+ Rezept hinzufügen</button>
+         <div class="mt-3 text-xs text-orange-600">
+          <div>
+           Benötigte Tags: <span id="lunch-missing-tags" class="font-medium"></span>
+          </div>
+         </div>
+        </div><!-- Dinner -->
+        <div class="bg-white p-4 rounded-lg">
+         <h5 class="font-medium text-orange-700 mb-3">Abendessen</h5>
+         <div id="dinner-recipes" class="space-y-2 mb-3"><!-- Selected recipes will appear here -->
+         </div><button onclick="selectRecipeForMeal('Abendessen')" class="w-full bg-orange-500 text-white py-2 rounded hover:bg-orange-600 text-sm">+ Rezept hinzufügen</button>
+         <div class="mt-3 text-xs text-orange-600">
+          <div>
+           Benötigte Tags: <span id="dinner-missing-tags" class="font-medium"></span>
+          </div>
+         </div>
+        </div><!-- Dessert -->
+        <div class="bg-white p-4 rounded-lg">
+         <h5 class="font-medium text-orange-700 mb-3">Nachtisch</h5>
+         <div id="dessert-recipes" class="space-y-2 mb-3"><!-- Selected recipes will appear here -->
+         </div><button id="dessert-add-recipe-btn" onclick="selectRecipeForMeal('Nachtisch')" class="w-full bg-orange-500 text-white py-2 rounded hover:bg-orange-600 text-sm">+ Rezept hinzufügen</button> <button onclick="addNoRecipeToMeal('Nachtisch')" class="w-full bg-gray-400 text-white py-2 rounded hover:bg-gray-500 text-sm mt-2">Ohne Nachtisch</button>
+         <div class="mt-3 text-xs text-orange-600">
+          <div>
+           Benötigte Tags: <span id="dessert-missing-tags" class="font-medium"></span>
+          </div>
+         </div>
+        </div>
+       </div>
+      </div>
+      <div class="flex justify-between"><button onclick="previousDay()" id="prev-day-btn" class="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600" disabled>← Vorheriger Tag</button> <button onclick="nextDay()" id="next-day-btn" class="bg-orange-600 text-white px-6 py-2 rounded-lg hover:bg-orange-700">Nächster Tag →</button>
+      </div>
+     </div><!-- Step 3: Person Count Configuration -->
+     <div id="workflow-step-3" class="workflow-step hidden">
+      <h3 class="text-lg font-semibold text-orange-700 mb-4">Schritt 3: Personenanzahl konfigurieren</h3>
+      <div class="bg-orange-50 p-4 rounded-lg mb-6">
+       <h4 class="font-medium text-orange-800 mb-4" id="person-config-date">Datum - Mahlzeit</h4>
+       <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <div class="text-center"><label class="block text-sm font-medium text-orange-800 mb-2">Omnivor</label> <input type="number" id="omnivor-count" min="0" value="0" class="w-full text-center border border-orange-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+        </div>
+        <div class="text-center"><label class="block text-sm font-medium text-orange-800 mb-2">Vegetarisch</label> <input type="number" id="vegetarian-count" min="0" value="0" class="w-full text-center border border-orange-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+        </div>
+        <div class="text-center"><label class="block text-sm font-medium text-orange-800 mb-2">Vegan</label> <input type="number" id="vegan-count" min="0" value="0" class="w-full text-center border border-orange-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+        </div>
+        <div class="text-center"><label class="block text-sm font-medium text-orange-800 mb-2">Glutenfrei</label> <input type="number" id="glutenfree-count" min="0" value="0" class="w-full text-center border border-orange-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+        </div>
+        <div class="text-center"><label class="block text-sm font-medium text-orange-800 mb-2">Laktosefrei</label> <input type="number" id="lactosefree-count" min="0" value="0" class="w-full text-center border border-orange-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500">
+        </div>
+       </div>
+       <div class="mt-4 p-3 bg-white rounded border">
+        <h5 class="font-medium text-orange-800 mb-2">Ausgewählte Rezepte für diese Mahlzeit:</h5>
+        <div id="person-config-recipes" class="space-y-2"><!-- Recipes for current meal will be shown here -->
+        </div>
+       </div>
+      </div>
+      <div class="flex justify-between"><button onclick="previousMealConfig()" id="prev-meal-btn" class="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600" disabled>← Vorherige Mahlzeit</button> <button onclick="nextMealConfig()" id="next-meal-btn" class="bg-orange-600 text-white px-6 py-2 rounded-lg hover:bg-orange-700">Nächste Mahlzeit →</button>
+      </div>
+     </div><!-- Step 4: Summary and Save -->
+     <div id="workflow-step-4" class="workflow-step hidden">
+      <h3 class="text-lg font-semibold text-orange-700 mb-4">Schritt 4: Zusammenfassung und Einkaufslisten</h3>
+      <div class="bg-orange-50 p-4 rounded-lg mb-6">
+       <h4 class="font-medium text-orange-800 mb-4">Essensplan Übersicht</h4>
+       <div id="workflow-summary" class="space-y-4"><!-- Summary will be populated here -->
+       </div>
+      </div><!-- Shopping Lists Section -->
+      <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+       <div class="flex justify-between items-center mb-4">
+        <h4 class="font-medium text-blue-800">Einkaufslisten erstellen (optional)</h4><button onclick="addShoppingListToWorkflow()" class="bg-blue-600 text-white px-3 py-2 rounded hover:bg-blue-700 text-sm">+ Einkaufsliste hinzufügen</button>
+       </div>
+       <div id="workflow-shopping-lists" class="space-y-3"><!-- Shopping lists will be populated here -->
+       </div>
+       <p class="text-xs text-blue-600 mt-3">Sie können beliebig viele Einkaufslisten für verschiedene Geschäfte und Zeiträume erstellen.</p>
+      </div>
+      <div class="flex justify-between"><button onclick="backToPersonConfig()" class="bg-gray-500 text-white px-6 py-2 rounded-lg hover:bg-gray-600">← Zurück</button> <button onclick="saveMealPlan()" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700" id="save-meal-plan-btn">Essensplan speichern</button>
+      </div>
+     </div><!-- Recipe Selection for Workflow -->
+     <div id="workflow-recipe-selection" class="hidden">
+      <h4 class="text-lg font-semibold text-orange-700 mb-4">Rezept für <span id="current-meal-type">Mahlzeit</span> auswählen</h4>
+      <div class="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
+       <p class="text-sm text-yellow-800"><strong>Fehlende Tags:</strong> <span id="missing-tags-display" class="font-medium"></span></p>
+       <p class="text-xs text-yellow-600 mt-1">Wählen Sie Rezepte mit diesen Tags aus, um alle Ernährungsformen abzudecken.</p>
+      </div>
+      <div id="workflow-recipe-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto mb-4"><!-- Recipe selection will be populated here -->
+      </div>
+      <div class="flex justify-end space-x-4"><button onclick="cancelRecipeSelection()" class="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600">Abbrechen</button>
+      </div>
+     </div><!-- Shopping Creation Dialog -->
+     <div id="shopping-creation-dialog" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+       <h3 class="text-xl font-bold text-orange-800 mb-4">Einkaufsliste erstellen</h3>
+       <div class="mb-4"><label class="block text-sm font-medium text-orange-800 mb-2">Supermarkt auswählen:</label> <select id="shopping-store-select" class="w-full border border-orange-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500"> <option value="">Bitte Supermarkt wählen</option> </select>
+       </div>
+       <div class="mb-4"><label class="block text-sm font-medium text-orange-800 mb-2">Tage für Einkauf auswählen:</label>
+        <div id="shopping-days-selection" class="space-y-2 max-h-48 overflow-y-auto"><!-- Days will be populated here -->
+        </div>
+       </div>
+       <div class="flex justify-end space-x-4"><button onclick="cancelShoppingCreation()" class="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600">Abbrechen</button> <button onclick="createShoppingListFromWorkflow()" class="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700">Einkaufsliste erstellen</button>
+       </div>
+      </div>
+     </div><!-- Success Confirmation Dialog -->
+     <div id="success-confirmation-dialog" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+       <div class="text-center">
+        <div class="text-6xl mb-4">
+         ✅
+        </div>
+        <h3 class="text-xl font-bold text-green-800 mb-4" id="success-message">Erfolgreich gespeichert!</h3>
+        <p class="text-green-600 mb-6">Ihr Essensplan wurde erfolgreich erstellt und ist nun in der Übersicht verfügbar.</p><button onclick="closeSuccessConfirmation()" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700">OK</button>
+       </div>
+      </div>
+     </div>
+    </div>
+   </div><!-- Shopping Section -->
+   <div id="shopping-section" class="hidden max-w-7xl mx-auto px-4 py-8">
+    <div class="flex justify-between items-center mb-6">
+     <h2 class="text-2xl font-bold text-orange-800">Einkaufsplanung</h2><button onclick="showShoppingPlanForm()" class="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition-colors">+ Neuen Einkauf planen</button>
+    </div>
+    <div id="shopping-plans" class="space-y-6"><!-- Shopping plans will be populated here -->
+    </div><!-- Shopping Plan Form -->
+    <div id="shopping-plan-form" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+     <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+      <h3 class="text-xl font-bold text-orange-800 mb-4" id="shopping-form-title">Einkauf planen</h3>
+      <form id="shopping-form"><input type="date" id="shopping-date" required class="w-full border border-orange-200 rounded-lg px-3 py-2 mb-4 focus:outline-none focus:ring-2 focus:ring-orange-500"> <select id="shopping-store" required class="w-full border border-orange-200 rounded-lg px-3 py-2 mb-4 focus:outline-none focus:ring-2 focus:ring-orange-500"> <option value="">Geschäft wählen</option> </select>
+       <div class="mb-4"><label class="block text-sm font-medium text-orange-800 mb-2">Tage für Einkauf auswählen:</label>
+        <div id="day-selection" class="space-y-2 max-h-48 overflow-y-auto"><!-- Days will be populated here -->
+        </div>
+       </div>
+       <div class="flex justify-end space-x-4"><button type="button" onclick="hideShoppingPlanForm()" class="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors">Abbrechen</button> <button type="submit" class="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition-colors" id="shopping-submit-btn">Einkauf erstellen</button>
+       </div>
+      </form>
+     </div>
+    </div>
+   </div>
+  </div>
+  <script>
+        // Global variables
+        let allData = [];
+        let currentWeekStart = new Date();
+        let currentSection = 'welcome';
+        let selectedMealSlot = null;
+        let isLoading = false;
+
+        // Get recipe icon based on category and title
+        function getRecipeIcon(category, title) {
+            const titleLower = title.toLowerCase();
+            
+            // Specific recipe icons
+            if (titleLower.includes('spaghetti') || titleLower.includes('pasta')) return '🍝';
+            if (titleLower.includes('pancake')) return '🥞';
+            if (titleLower.includes('salat') || titleLower.includes('quinoa')) return '🥗';
+            if (titleLower.includes('kürbis') || titleLower.includes('suppe')) return '🍲';
+            if (titleLower.includes('smoothie')) return '🥤';
+            if (titleLower.includes('hähnchen') || titleLower.includes('chicken')) return '🍗';
+            if (titleLower.includes('pizza')) return '🍕';
+            if (titleLower.includes('burger')) return '🍔';
+            if (titleLower.includes('fisch') || titleLower.includes('fish')) return '🐟';
+            if (titleLower.includes('reis') || titleLower.includes('rice')) return '🍚';
+            if (titleLower.includes('brot') || titleLower.includes('bread')) return '🍞';
+            if (titleLower.includes('kuchen') || titleLower.includes('cake')) return '🍰';
+            if (titleLower.includes('eis') || titleLower.includes('ice')) return '🍦';
+            
+            // Category-based icons
+            switch (category) {
+                case 'Frühstück': return '🥐';
+                case 'Hauptgericht': return '🍽️';
+                case 'Vorspeise': return '🍲';
+                case 'Nachspeise': return '🍰';
+                case 'Snack': return '🍪';
+                case 'Getränk': return '🥤';
+                default: return '🍽️';
+            }
+        }
+
+        // Workflow variables
+        let workflowData = {
+            startDate: null,
+            endDate: null,
+            days: [],
+            currentDayIndex: 0,
+            currentMealIndex: 0,
+            selectedRecipes: {}, // { "2024-01-01": { "Frühstück": [recipeIds], "Mittagessen": [recipeIds], "Abendessen": [recipeIds] } }
+            personCounts: {}, // { "2024-01-01": { "Frühstück": { omnivor: 2, vegetarian: 1, ... }, ... } }
+            currentMealType: null,
+            editingMealPlan: null,
+            shoppingLists: [] // Array of shopping list configurations to be created
+        };
+
+        const requiredTags = ['Omnivor', 'Vegetarisch', 'Vegan', 'Glutenfrei', 'Laktosefrei'];
+        const mealTypes = ['Frühstück', 'Mittagessen', 'Abendessen', 'Nachtisch'];
+
+        // Default configuration
+        const defaultConfig = {
+            app_title: "Mein Kochbuch",
+            welcome_message: "Willkommen in Ihrem digitalen Kochbuch!"
+        };
+
+        // Data handler for SDK
+        const dataHandler = {
+            onDataChanged(data) {
+                allData = data;
+                updateUI();
+            }
+        };
+
+        // Element SDK configuration
+        const elementConfig = {
+            defaultConfig: defaultConfig,
+            onConfigChange: async (config) => {
+                document.getElementById('app-title').textContent = config.app_title || defaultConfig.app_title;
+                document.getElementById('welcome-message').textContent = config.welcome_message || defaultConfig.welcome_message;
+            },
+            mapToCapabilities: (config) => ({
+                recolorables: [],
+                borderables: [],
+                fontEditable: undefined,
+                fontSizeable: undefined
+            }),
+            mapToEditPanelValues: (config) => new Map([
+                ["app_title", config.app_title || defaultConfig.app_title],
+                ["welcome_message", config.welcome_message || defaultConfig.welcome_message]
+            ])
+        };
+
+        // Initialize app
+        async function initApp() {
+            try {
+                // Initialize Data SDK
+                const initResult = await window.dataSdk.init(dataHandler);
+                if (!initResult.isOk) {
+                    console.error("Failed to initialize data SDK");
+                    return;
+                }
+
+                // Initialize Element SDK
+                if (window.elementSdk) {
+                    await window.elementSdk.init(elementConfig);
+                }
+
+                // Set current week to start of this week
+                const today = new Date();
+                currentWeekStart = new Date(today);
+                currentWeekStart.setDate(today.getDate() - today.getDay());
+                
+                // Add sample data if database is empty
+                await addSampleDataIfEmpty();
+                
+                updateUI();
+            } catch (error) {
+                console.error("Failed to initialize app:", error);
+            }
+        }
+
+        // Add sample data if database is empty
+        async function addSampleDataIfEmpty() {
+            // Only add sample data if there are no existing recipes or stores
+            const existingRecipes = allData.filter(item => item.type === 'recipe');
+            const existingStores = allData.filter(item => item.type === 'store');
+            
+            if (existingRecipes.length === 0 && existingStores.length === 0) {
+                // Add sample stores first
+                const sampleStores = [
+                    {
+                        id: 'store_rewe',
+                        type: 'store',
+                        storeName: 'REWE',
+                        storeAddress: 'Hauptstraße 123, 12345 Musterstadt',
+                        createdAt: new Date().toISOString()
+                    },
+                    {
+                        id: 'store_edeka',
+                        type: 'store',
+                        storeName: 'EDEKA',
+                        storeAddress: 'Marktplatz 45, 12345 Musterstadt',
+                        createdAt: new Date().toISOString()
+                    },
+                    {
+                        id: 'store_aldi',
+                        type: 'store',
+                        storeName: 'ALDI',
+                        storeAddress: 'Industriestraße 67, 12345 Musterstadt',
+                        createdAt: new Date().toISOString()
+                    }
+                ];
+
+                for (const store of sampleStores) {
+                    await window.dataSdk.create(store);
+                }
+
+                // Add sample recipes
+                const sampleRecipes = [
+                    // Frühstück
+                    {
+                        id: 'recipe_pancakes',
+                        type: 'recipe',
+                        title: 'Vegane Pancakes',
+                        category: 'Frühstück',
+                        servings: 2,
+                        cookTime: 20,
+                        tags: 'Vegan, Vegetarisch, Laktosefrei',
+                        ingredients: JSON.stringify([
+                            { quantity: '200', unit: 'g', name: 'Mehl', stores: ['store_rewe', 'store_edeka', 'store_aldi'] },
+                            { quantity: '250', unit: 'ml', name: 'Hafermilch', stores: ['store_rewe', 'store_edeka'] },
+                            { quantity: '2', unit: 'EL', name: 'Zucker', stores: ['store_rewe', 'store_edeka', 'store_aldi'] },
+                            { quantity: '1', unit: 'TL', name: 'Backpulver', stores: ['store_rewe', 'store_edeka'] },
+                            { quantity: '1', unit: 'Prise', name: 'Salz', stores: ['store_rewe', 'store_edeka', 'store_aldi'] },
+                            { quantity: '2', unit: 'EL', name: 'Öl', stores: ['store_rewe', 'store_edeka', 'store_aldi'] }
+                        ]),
+                        steps: 'Alle trockenen Zutaten in einer Schüssel vermischen\nHafermilch und Öl hinzufügen und zu einem glatten Teig verrühren\nTeig 5 Minuten ruhen lassen\nPancakes in der Pfanne von beiden Seiten goldbraun backen\nMit Ahornsirup und Früchten servieren',
+                        createdAt: new Date().toISOString()
+                    },
+                    {
+                        id: 'recipe_omelette',
+                        type: 'recipe',
+                        title: 'Klassisches Omelette',
+                        category: 'Frühstück',
+                        servings: 1,
+                        cookTime: 10,
+                        tags: 'Omnivor, Vegetarisch, Glutenfrei',
+                        ingredients: JSON.stringify([
+                            { quantity: '3', unit: 'Stück', name: 'Eier', stores: ['store_rewe', 'store_edeka', 'store_aldi'] },
+                            { quantity: '2', unit: 'EL', name: 'Milch', stores: ['store_rewe', 'store_edeka', 'store_aldi'] },
+                            { quantity: '1', unit: 'EL', name: 'Butter', stores: ['store_rewe', 'store_edeka', 'store_aldi'] },
+                            { quantity: '50', unit: 'g', name: 'Käse (gerieben)', stores: ['store_rewe', 'store_edeka'] },
+                            { quantity: '1', unit: 'Prise', name: 'Salz', stores: ['store_rewe', 'store_edeka', 'store_aldi'] },
+                            { quantity: '1', unit: 'Prise', name: 'Pfeffer', stores: ['store_rewe', 'store_edeka', 'store_aldi'] }
+                        ]),
+                        steps: 'Eier mit Milch, Salz und Pfeffer verquirlen\nButter in der Pfanne erhitzen\nEimasse eingießen und bei mittlerer Hitze stocken lassen\nKäse auf eine Hälfte geben\nOmelette zusammenklappen und servieren',
+                        createdAt: new Date().toISOString()
+                    },
+
+                    // Hauptgerichte
+                    {
+                        id: 'recipe_spaghetti',
+                        type: 'recipe',
+                        title: 'Spaghetti Bolognese',
+                        category: 'Hauptgericht',
+                        servings: 4,
+                        cookTime: 45,
+                        tags: 'Omnivor',
+                        ingredients: JSON.stringify([
+                            { quantity: '400', unit: 'g', name: 'Spaghetti', stores: ['store_rewe', 'store_edeka'] },
+                            { quantity: '500', unit: 'g', name: 'Hackfleisch', stores: ['store_rewe', 'store_edeka'] },
+                            { quantity: '1', unit: 'Dose', name: 'Tomaten (gehackt)', stores: ['store_rewe', 'store_edeka', 'store_aldi'] },
+                            { quantity: '1', unit: 'Stück', name: 'Zwiebel', stores: ['store_rewe', 'store_edeka', 'store_aldi'] },
+                            { quantity: '2', unit: 'Zehen', name: 'Knoblauch', stores: ['store_rewe', 'store_edeka'] },
+                            { quantity: '100', unit: 'g', name: 'Parmesan', stores: ['store_rewe', 'store_edeka'] }
+                        ]),
+                        steps: 'Zwiebel und Knoblauch fein hacken und in Olivenöl anbraten\nHackfleisch hinzufügen und krümelig braten\nTomaten hinzufügen, würzen und 30 Min köcheln lassen\nSpaghetti nach Packungsanweisung kochen\nSpaghetti mit Sauce servieren und Parmesan darüber reiben',
+                        createdAt: new Date().toISOString()
+                    },
+                    {
+                        id: 'recipe_salad',
+                        type: 'recipe',
+                        title: 'Bunter Quinoa-Salat',
+                        category: 'Hauptgericht',
+                        servings: 3,
+                        cookTime: 25,
+                        tags: 'Vegan, Vegetarisch, Glutenfrei',
+                        ingredients: JSON.stringify([
+                            { quantity: '200', unit: 'g', name: 'Quinoa', stores: ['store_rewe', 'store_edeka'] },
+                            { quantity: '1', unit: 'Stück', name: 'Gurke', stores: ['store_rewe', 'store_edeka', 'store_aldi'] },
+                            { quantity: '200', unit: 'g', name: 'Kirschtomaten', stores: ['store_rewe', 'store_edeka'] },
+                            { quantity: '1', unit: 'Stück', name: 'Paprika', stores: ['store_rewe', 'store_edeka', 'store_aldi'] },
+                            { quantity: '100', unit: 'g', name: 'Feta (optional)', stores: ['store_rewe', 'store_edeka'] },
+                            { quantity: '3', unit: 'EL', name: 'Olivenöl', stores: ['store_rewe', 'store_edeka'] },
+                            { quantity: '2', unit: 'EL', name: 'Zitronensaft', stores: ['store_rewe', 'store_edeka'] }
+                        ]),
+                        steps: 'Quinoa nach Packungsanweisung kochen und abkühlen lassen\nGemüse waschen und in kleine Würfel schneiden\nAlle Zutaten in einer großen Schüssel vermischen\nMit Olivenöl, Zitronensaft, Salz und Pfeffer abschmecken\nMindestens 30 Minuten ziehen lassen vor dem Servieren',
+                        createdAt: new Date().toISOString()
+                    }
+                ];
+
+                for (const recipe of sampleRecipes) {
+                    await window.dataSdk.create(recipe);
+                }
+            }
+        }
+
+        // Update UI based on current data
+        function updateUI() {
+            if (currentSection === 'recipes') {
+                renderRecipes();
+                populateCategoryFilter();
+            } else if (currentSection === 'stores') {
+                renderStores();
+            } else if (currentSection === 'mealplans') {
+                renderMealPlans();
+            } else if (currentSection === 'shopping') {
+                renderShoppingPlans();
+            }
+            
+            // Update store options in forms
+            populateStoreOptions();
+        }
+
+        // Show section
+        function showSection(section) {
+            // Hide all sections
+            document.getElementById('welcome-section').classList.add('hidden');
+            document.getElementById('recipes-section').classList.add('hidden');
+            document.getElementById('stores-section').classList.add('hidden');
+            document.getElementById('mealplans-section').classList.add('hidden');
+            document.getElementById('shopping-section').classList.add('hidden');
+            
+            // Show selected section
+            document.getElementById(section + '-section').classList.remove('hidden');
+            currentSection = section;
+            
+            // Update nav buttons
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('bg-orange-700');
+            });
+            
+            updateUI();
+        }
+
+        // Recipe functions
+        function getRecipes() {
+            return allData.filter(item => item.type === 'recipe');
+        }
+
+        function renderRecipes() {
+            const recipes = getRecipes();
+            const grid = document.getElementById('recipes-grid');
+            const searchTerm = document.getElementById('recipe-search')?.value.toLowerCase() || '';
+            const categoryFilter = document.getElementById('category-filter')?.value || '';
+            const ingredientFilter = document.getElementById('ingredient-filter')?.value.toLowerCase() || '';
+            
+            let filteredRecipes = recipes.filter(recipe => {
+                const matchesSearch = recipe.title.toLowerCase().includes(searchTerm) || 
+                                    recipe.tags.toLowerCase().includes(searchTerm);
+                const matchesCategory = !categoryFilter || recipe.category === categoryFilter;
+                const matchesIngredient = !ingredientFilter || 
+                                        recipe.ingredients.toLowerCase().includes(ingredientFilter);
+                
+                return matchesSearch && matchesCategory && matchesIngredient;
+            });
+            
+            grid.innerHTML = filteredRecipes.map(recipe => {
+                // Get recipe icon based on category and title
+                const recipeIcon = getRecipeIcon(recipe.category, recipe.title);
+                
+                return `
+                <div class="recipe-card bg-white rounded-lg shadow-md overflow-hidden cursor-pointer" 
+                     draggable="true" 
+                     ondragstart="dragStart(event, '${recipe.id}')"
+                     onclick="showRecipeDetail('${recipe.id}')">
+                    <div class="bg-gradient-to-br from-orange-100 to-orange-200 p-6 text-center">
+                        <div class="text-4xl mb-2">${recipeIcon}</div>
+                    </div>
+                    <div class="p-4">
+                        <h3 class="text-lg font-semibold text-orange-800 mb-2">${recipe.title}</h3>
+                        <div class="flex justify-between text-sm text-orange-600 mb-2">
+                            <span>🍽️ ${recipe.servings} Portionen</span>
+                            <span>⏱️ ${recipe.cookTime} Min</span>
+                        </div>
+                        <div class="text-sm text-orange-500 mb-2">
+                            <span class="bg-orange-100 px-2 py-1 rounded">${recipe.category}</span>
+                        </div>
+                        ${recipe.tags ? `<div class="text-xs text-orange-400">${recipe.tags}</div>` : ''}
+                    </div>
+                </div>
+            `;
+            }).join('');
+        }
+
+        function populateCategoryFilter() {
+            const recipes = getRecipes();
+            const categories = [...new Set(recipes.map(r => r.category))];
+            const filter = document.getElementById('category-filter');
+            
+            if (filter) {
+                filter.innerHTML = '<option value="">Alle Kategorien</option>' +
+                    categories.map(cat => `<option value="${cat}">${cat}</option>`).join('');
+            }
+        }
+
+        function showAddRecipeForm() {
+            document.getElementById('add-recipe-form').classList.remove('hidden');
+            populateStoreOptionsInIngredients();
+        }
+
+        function hideAddRecipeForm() {
+            document.getElementById('add-recipe-form').classList.add('hidden');
+            document.getElementById('recipe-form').reset();
+            resetIngredientsContainer();
+        }
+
+        function addIngredientRow() {
+            const container = document.getElementById('ingredients-container');
+            const newRow = document.createElement('div');
+            newRow.className = 'ingredient-row grid grid-cols-12 gap-2 mb-2';
+            newRow.innerHTML = `
+                <input type="text" placeholder="Menge" class="col-span-2 border border-orange-200 rounded px-2 py-1 text-sm ingredient-quantity">
+                <input type="text" placeholder="Einheit" class="col-span-2 border border-orange-200 rounded px-2 py-1 text-sm ingredient-unit">
+                <input type="text" placeholder="Zutat" class="col-span-4 border border-orange-200 rounded px-2 py-1 text-sm ingredient-name">
+                <select class="col-span-3 border border-orange-200 rounded px-2 py-1 text-sm ingredient-stores" multiple>
+                    ${getStores().map(store => `<option value="${store.id}">${store.storeName}</option>`).join('')}
+                </select>
+                <button type="button" onclick="removeIngredient(this)" class="col-span-1 bg-red-500 text-white rounded px-2 py-1 text-sm hover:bg-red-600">×</button>
+            `;
+            container.appendChild(newRow);
+        }
+
+        function removeIngredient(button) {
+            button.parentElement.remove();
+        }
+
+        function resetIngredientsContainer() {
+            const container = document.getElementById('ingredients-container');
+            container.innerHTML = `
+                <div class="ingredient-row grid grid-cols-12 gap-2 mb-2">
+                    <input type="text" placeholder="Menge" class="col-span-2 border border-orange-200 rounded px-2 py-1 text-sm ingredient-quantity">
+                    <input type="text" placeholder="Einheit" class="col-span-2 border border-orange-200 rounded px-2 py-1 text-sm ingredient-unit">
+                    <input type="text" placeholder="Zutat" class="col-span-4 border border-orange-200 rounded px-2 py-1 text-sm ingredient-name">
+                    <select class="col-span-3 border border-orange-200 rounded px-2 py-1 text-sm ingredient-stores" multiple>
+                    </select>
+                    <button type="button" onclick="removeIngredient(this)" class="col-span-1 bg-red-500 text-white rounded px-2 py-1 text-sm hover:bg-red-600">×</button>
+                </div>
+            `;
+            populateStoreOptionsInIngredients();
+        }
+
+        function populateStoreOptionsInIngredients() {
+            const stores = getStores();
+            const selects = document.querySelectorAll('.ingredient-stores');
+            selects.forEach(select => {
+                select.innerHTML = stores.map(store => 
+                    `<option value="${store.id}">${store.storeName}</option>`
+                ).join('');
+            });
+        }
+
+        async function saveRecipe(event) {
+            event.preventDefault();
+            
+            if (isLoading) return;
+            isLoading = true;
+            
+            const formData = new FormData(event.target);
+            const ingredientRows = document.querySelectorAll('.ingredient-row');
+            
+            const ingredients = Array.from(ingredientRows).map(row => {
+                const quantity = row.querySelector('.ingredient-quantity').value;
+                const unit = row.querySelector('.ingredient-unit').value;
+                const name = row.querySelector('.ingredient-name').value;
+                const storeSelect = row.querySelector('.ingredient-stores');
+                const stores = Array.from(storeSelect.selectedOptions).map(option => option.value);
+                
+                if (name.trim()) {
+                    return { quantity, unit, name, stores };
+                }
+                return null;
+            }).filter(Boolean);
+            
+            const recipe = {
+                id: 'recipe_' + Date.now(),
+                type: 'recipe',
+                title: document.getElementById('recipe-title').value,
+                category: document.getElementById('recipe-category').value,
+                servings: parseInt(document.getElementById('recipe-servings').value),
+                cookTime: parseInt(document.getElementById('recipe-cooktime').value),
+                tags: document.getElementById('recipe-tags').value,
+                ingredients: JSON.stringify(ingredients),
+                steps: document.getElementById('recipe-steps').value,
+                createdAt: new Date().toISOString()
+            };
+            
+            const result = await window.dataSdk.create(recipe);
+            
+            isLoading = false;
+            
+            if (result.isOk) {
+                hideAddRecipeForm();
+            } else {
+                alert('Fehler beim Speichern des Rezepts. Bitte versuchen Sie es erneut.');
+            }
+        }
+
+        function showRecipeDetail(recipeId) {
+            const recipe = allData.find(item => item.id === recipeId);
+            if (!recipe) return;
+            
+            const ingredients = JSON.parse(recipe.ingredients || '[]');
+            const steps = recipe.steps.split('\n').filter(step => step.trim());
+            
+            const modal = document.getElementById('recipe-detail-modal');
+            const content = document.getElementById('recipe-detail-content');
+            
+            content.innerHTML = `
+                <div class="flex justify-between items-start mb-4">
+                    <h2 class="text-2xl font-bold text-orange-800">${recipe.title}</h2>
+                    <div class="flex space-x-2">
+                        <button onclick="editRecipe('${recipe.id}')" class="bg-orange-600 text-white px-3 py-1 rounded hover:bg-orange-700">Bearbeiten</button>
+                        <button onclick="deleteRecipe('${recipe.id}')" class="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700">Löschen</button>
+                        <button onclick="hideRecipeDetail()" class="bg-gray-500 text-white px-3 py-1 rounded hover:bg-gray-600">×</button>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <div class="flex justify-between text-sm text-orange-600 mb-4">
+                            <span>🍽️ ${recipe.servings} Portionen</span>
+                            <span>⏱️ ${recipe.cookTime} Minuten</span>
+                            <span class="bg-orange-100 px-2 py-1 rounded">${recipe.category}</span>
+                        </div>
+                        
+                        ${recipe.tags ? `<div class="mb-4"><strong>Tags:</strong> ${recipe.tags}</div>` : ''}
+                        
+                        <h3 class="text-lg font-semibold text-orange-800 mb-2">Zutaten:</h3>
+                        <ul class="space-y-1 mb-4">
+                            ${ingredients.map(ing => `
+                                <li class="flex justify-between">
+                                    <span>${ing.quantity} ${ing.unit} ${ing.name}</span>
+                                    ${ing.stores && ing.stores.length > 0 ? 
+                                        `<span class="text-xs text-orange-500">${ing.stores.map(storeId => {
+                                            const store = allData.find(s => s.id === storeId);
+                                            return store ? store.storeName : storeId;
+                                        }).join(', ')}</span>` : ''
+                                    }
+                                </li>
+                            `).join('')}
+                        </ul>
+                    </div>
+                    
+                    <div>
+                        <h3 class="text-lg font-semibold text-orange-800 mb-2">Zubereitung:</h3>
+                        <ol class="space-y-2">
+                            ${steps.map((step, index) => `
+                                <li class="flex">
+                                    <span class="bg-orange-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm mr-3 flex-shrink-0">${index + 1}</span>
+                                    <span>${step}</span>
+                                </li>
+                            `).join('')}
+                        </ol>
+                    </div>
+                </div>
+            `;
+            
+            modal.classList.remove('hidden');
+        }
+
+        function hideRecipeDetail() {
+            document.getElementById('recipe-detail-modal').classList.add('hidden');
+        }
+
+        async function deleteRecipe(recipeId) {
+            const recipe = allData.find(item => item.id === recipeId);
+            if (!recipe) return;
+            
+            // Show inline confirmation
+            const confirmButton = event.target;
+            const originalText = confirmButton.textContent;
+            confirmButton.textContent = 'Wirklich löschen?';
+            confirmButton.classList.remove('bg-red-600', 'hover:bg-red-700');
+            confirmButton.classList.add('bg-red-800');
+            
+            // Create cancel button
+            const cancelButton = document.createElement('button');
+            cancelButton.textContent = 'Abbrechen';
+            cancelButton.className = 'bg-gray-500 text-white px-3 py-1 rounded hover:bg-gray-600 ml-2';
+            cancelButton.onclick = () => {
+                confirmButton.textContent = originalText;
+                confirmButton.classList.remove('bg-red-800');
+                confirmButton.classList.add('bg-red-600', 'hover:bg-red-700');
+                cancelButton.remove();
+                confirmButton.onclick = () => deleteRecipe(recipeId);
+            };
+            
+            confirmButton.parentNode.insertBefore(cancelButton, confirmButton.nextSibling);
+            
+            confirmButton.onclick = async () => {
+                const result = await window.dataSdk.delete(recipe);
+                if (result.isOk) {
+                    hideRecipeDetail();
+                } else {
+                    alert('Fehler beim Löschen des Rezepts.');
+                }
+            };
+        }
+
+        // Store functions
+        function getStores() {
+            return allData.filter(item => item.type === 'store');
+        }
+
+        function renderStores() {
+            const stores = getStores();
+            const grid = document.getElementById('stores-grid');
+            
+            grid.innerHTML = stores.map(store => `
+                <div class="bg-white rounded-lg shadow-md p-4">
+                    <h3 class="text-lg font-semibold text-orange-800 mb-2">${store.storeName}</h3>
+                    ${store.storeAddress ? `<p class="text-orange-600 text-sm mb-4">${store.storeAddress}</p>` : ''}
+                    <div class="flex justify-end space-x-2">
+                        <button onclick="deleteStore('${store.id}')" class="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700">Löschen</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function showAddStoreForm() {
+            document.getElementById('add-store-form').classList.remove('hidden');
+        }
+
+        function hideAddStoreForm() {
+            document.getElementById('add-store-form').classList.add('hidden');
+            document.getElementById('store-form').reset();
+        }
+
+        async function saveStore(event) {
+            event.preventDefault();
+            
+            if (isLoading) return;
+            isLoading = true;
+            
+            const store = {
+                id: 'store_' + Date.now(),
+                type: 'store',
+                storeName: document.getElementById('store-name').value,
+                storeAddress: document.getElementById('store-address').value,
+                createdAt: new Date().toISOString()
+            };
+            
+            const result = await window.dataSdk.create(store);
+            
+            isLoading = false;
+            
+            if (result.isOk) {
+                hideAddStoreForm();
+            } else {
+                alert('Fehler beim Speichern des Geschäfts.');
+            }
+        }
+
+        async function deleteStore(storeId) {
+            const store = allData.find(item => item.id === storeId);
+            if (!store) return;
+            
+            const result = await window.dataSdk.delete(store);
+            if (!result.isOk) {
+                alert('Fehler beim Löschen des Geschäfts.');
+            }
+        }
+
+        function populateStoreOptions() {
+            const stores = getStores();
+            const selects = document.querySelectorAll('#shopping-store');
+            
+            selects.forEach(select => {
+                select.innerHTML = '<option value="">Geschäft wählen</option>' +
+                    stores.map(store => `<option value="${store.id}">${store.storeName}</option>`).join('');
+            });
+        }
+
+        // Meal Plan functions
+        function getMealPlans() {
+            return allData.filter(item => item.type === 'mealplan');
+        }
+
+        function getMealsForMealPlan(mealPlanId) {
+            return allData.filter(item => item.type === 'meal' && item.mealPlanId === mealPlanId);
+        }
+
+        function getMealsForDate(dateStr) {
+            return allData.filter(item => item.type === 'meal' && item.date === dateStr);
+        }
+
+        function renderMealPlans() {
+            const mealPlans = getMealPlans();
+            const container = document.getElementById('mealplans-grid');
+            
+            if (mealPlans.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-8">
+                        <p class="text-orange-600">Noch keine Essenspläne erstellt.</p>
+                        <button onclick="startMealPlanningWorkflow()" class="mt-4 bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700">Ersten Essensplan erstellen</button>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = mealPlans.map(mealPlan => {
+                const meals = getMealsForMealPlan(mealPlan.id);
+                const startDate = new Date(mealPlan.startDate).toLocaleDateString('de-DE');
+                const endDate = new Date(mealPlan.endDate).toLocaleDateString('de-DE');
+                const totalMeals = meals.length;
+                const uniqueRecipes = new Set(meals.map(m => m.recipeId)).size;
+                
+                // Find related shopping plans
+                const relatedShoppingPlans = getShoppingPlansForMealPlan(mealPlan);
+                
+                return `
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <h3 class="text-lg font-semibold text-orange-800">${mealPlan.name}</h3>
+                                <p class="text-orange-600">${startDate} - ${endDate}</p>
+                                <p class="text-sm text-orange-500">${totalMeals} Mahlzeiten • ${uniqueRecipes} verschiedene Rezepte</p>
+                            </div>
+                            <div class="flex space-x-2">
+                                <button onclick="exportMealPlanToPDF('${mealPlan.id}')" class="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 text-sm">📄 PDF Export</button>
+                                <button onclick="editMealPlan('${mealPlan.id}')" class="bg-orange-600 text-white px-3 py-1 rounded hover:bg-orange-700">Bearbeiten</button>
+                                <button onclick="deleteMealPlan('${mealPlan.id}')" class="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700">Löschen</button>
+                            </div>
+                        </div>
+                        
+                        <div class="border-t pt-4">
+                            <h4 class="font-medium text-orange-800 mb-4">Wochenübersicht:</h4>
+                            <div class="overflow-x-auto">
+                                <table class="w-full border-collapse border border-orange-200">
+                                    <thead>
+                                        <tr class="bg-orange-100">
+                                            <th class="border border-orange-200 p-2 text-left text-sm font-medium text-orange-800">Mahlzeit</th>
+                                            ${(() => {
+                                                const days = [];
+                                                const start = new Date(mealPlan.startDate);
+                                                const end = new Date(mealPlan.endDate);
+                                                const current = new Date(start);
+                                                while (current <= end) {
+                                                    days.push(new Date(current));
+                                                    current.setDate(current.getDate() + 1);
+                                                }
+                                                return days.map(day => `
+                                                    <th class="border border-orange-200 p-2 text-center text-xs font-medium text-orange-800">
+                                                        <div>${day.toLocaleDateString('de-DE', { weekday: 'short' })}</div>
+                                                        <div>${day.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}</div>
+                                                    </th>
+                                                `).join('');
+                                            })()}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${mealTypes.map(mealType => {
+                                            const days = [];
+                                            const start = new Date(mealPlan.startDate);
+                                            const end = new Date(mealPlan.endDate);
+                                            const current = new Date(start);
+                                            while (current <= end) {
+                                                days.push(new Date(current));
+                                                current.setDate(current.getDate() + 1);
+                                            }
+                                            
+                                            return `
+                                                <tr>
+                                                    <td class="border border-orange-200 p-2 bg-orange-50 font-medium text-orange-700 text-sm">${mealType}</td>
+                                                    ${days.map(day => {
+                                                        const dateStr = day.toISOString().split('T')[0];
+                                                        const dayMeals = meals.filter(m => m.date === dateStr && m.mealType === mealType);
+                                                        return `
+                                                            <td class="border border-orange-200 p-1 text-xs">
+                                                                ${dayMeals.length > 0 ? dayMeals.map(meal => {
+                                                                    if (meal.recipeId === 'no-recipe') {
+                                                                        return '<div class="text-gray-500 italic">ohne</div>';
+                                                                    }
+                                                                    const recipe = allData.find(r => r.id === meal.recipeId);
+                                                                    return recipe ? `<div class="text-orange-700">${recipe.title}</div>` : '';
+                                                                }).join('') : '<div class="text-gray-400">-</div>'}
+                                                            </td>
+                                                        `;
+                                                    }).join('')}
+                                                </tr>
+                                            `;
+                                        }).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        
+                        ${relatedShoppingPlans.length > 0 ? `
+                            <div class="border-t pt-4 mt-4">
+                                <h4 class="font-medium text-orange-800 mb-3">🛒 Zugehörige Einkaufslisten (${relatedShoppingPlans.length})</h4>
+                                <div class="space-y-3">
+                                    ${relatedShoppingPlans.map(plan => {
+                                        const store = allData.find(s => s.id === plan.shoppingStore);
+                                        const selectedDays = JSON.parse(plan.selectedDays || '[]');
+                                        const shoppingList = generateShoppingList(selectedDays, plan.shoppingStore);
+                                        
+                                        return `
+                                            <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                                                <div class="flex justify-between items-start mb-2">
+                                                    <div>
+                                                        <h5 class="font-medium text-blue-800">${plan.shoppingName}</h5>
+                                                        <p class="text-sm text-blue-600">
+                                                            📅 ${new Date(plan.shoppingDate).toLocaleDateString('de-DE')} • 
+                                                            🏪 ${store ? store.storeName : 'Unbekanntes Geschäft'}
+                                                        </p>
+                                                        <p class="text-xs text-blue-500">Tage: ${selectedDays.map(d => new Date(d).toLocaleDateString('de-DE', {day: '2-digit', month: '2-digit'})).join(', ')}</p>
+                                                    </div>
+                                                    <div class="flex space-x-2">
+                                                        <button onclick="exportShoppingListToPDF('${plan.id}')" class="bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700 text-xs">📄 PDF</button>
+                                                        <button onclick="toggleShoppingListView('shopping-list-${plan.id}')" class="text-blue-600 hover:text-blue-800 text-sm">
+                                                            <span id="toggle-text-${plan.id}">Anzeigen ▼</span>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div id="shopping-list-${plan.id}" class="hidden mt-3 pt-3 border-t border-blue-200">
+                                                    <h6 class="font-medium text-blue-700 mb-2">Einkaufsliste (${shoppingList.length} Artikel):</h6>
+                                                    ${shoppingList.length > 0 ? `
+                                                        <div class="space-y-1 max-h-48 overflow-y-auto">
+                                                            ${shoppingList.map(item => `
+                                                                <div class="flex items-center justify-between p-2 bg-white rounded text-sm">
+                                                                    <div class="flex items-center">
+                                                                        <input type="checkbox" class="mr-2" onchange="toggleShoppingItem(this)">
+                                                                        <span>${item.quantity} ${item.unit} ${item.name}</span>
+                                                                    </div>
+                                                                    <span class="text-xs text-blue-500">${item.recipes.slice(0, 2).join(', ')}${item.recipes.length > 2 ? '...' : ''}</span>
+                                                                </div>
+                                                            `).join('')}
+                                                        </div>
+                                                    ` : '<p class="text-blue-500 text-sm">Keine Artikel für dieses Geschäft gefunden.</p>'}
+                                                </div>
+                                            </div>
+                                        `;
+                                    }).join('')}
+                                </div>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function editMealPlan(mealPlanId) {
+            const mealPlan = allData.find(item => item.id === mealPlanId);
+            if (!mealPlan) return;
+
+            // Show warning dialog
+            workflowData.editingMealPlan = mealPlan;
+            document.getElementById('edit-warning-dialog').classList.remove('hidden');
+        }
+
+        function cancelEditWarning() {
+            document.getElementById('edit-warning-dialog').classList.add('hidden');
+            workflowData.editingMealPlan = null;
+        }
+
+        async function confirmEditWarning() {
+            document.getElementById('edit-warning-dialog').classList.add('hidden');
+            
+            if (!workflowData.editingMealPlan) return;
+
+            // Delete all related shopping plans
+            const relatedShoppingPlans = allData.filter(item => 
+                item.type === 'shopping' && 
+                item.selectedDays && 
+                JSON.parse(item.selectedDays).some(day => {
+                    const dayDate = new Date(day);
+                    const startDate = new Date(workflowData.editingMealPlan.startDate);
+                    const endDate = new Date(workflowData.editingMealPlan.endDate);
+                    return dayDate >= startDate && dayDate <= endDate;
+                })
+            );
+
+            for (const shoppingPlan of relatedShoppingPlans) {
+                await window.dataSdk.delete(shoppingPlan);
+            }
+
+            // Load existing meal plan data into workflow
+            const mealPlan = workflowData.editingMealPlan;
+            const meals = getMealsForMealPlan(mealPlan.id);
+
+            // Set up workflow data
+            workflowData.startDate = new Date(mealPlan.startDate);
+            workflowData.endDate = new Date(mealPlan.endDate);
+            workflowData.days = [];
+            workflowData.selectedRecipes = {};
+            workflowData.personCounts = {};
+
+            // Calculate days
+            const current = new Date(workflowData.startDate);
+            while (current <= workflowData.endDate) {
+                workflowData.days.push(new Date(current));
+                current.setDate(current.getDate() + 1);
+            }
+
+            // Load existing meals into workflow data
+            workflowData.days.forEach(day => {
+                const dateStr = day.toISOString().split('T')[0];
+                workflowData.selectedRecipes[dateStr] = {
+                    'Frühstück': [],
+                    'Mittagessen': [],
+                    'Abendessen': [],
+                    'Nachtisch': []
+                };
+                workflowData.personCounts[dateStr] = {
+                    'Frühstück': { omnivor: 0, vegetarian: 0, vegan: 0, glutenfree: 0, lactosefree: 0 },
+                    'Mittagessen': { omnivor: 0, vegetarian: 0, vegan: 0, glutenfree: 0, lactosefree: 0 },
+                    'Abendessen': { omnivor: 0, vegetarian: 0, vegan: 0, glutenfree: 0, lactosefree: 0 },
+                    'Nachtisch': { omnivor: 0, vegetarian: 0, vegan: 0, glutenfree: 0, lactosefree: 0 }
+                };
+
+                // Load existing meals for this date
+                const dayMeals = meals.filter(m => m.date === dateStr);
+                dayMeals.forEach(meal => {
+                    if (workflowData.selectedRecipes[dateStr][meal.mealType]) {
+                        workflowData.selectedRecipes[dateStr][meal.mealType].push(meal.recipeId);
+                        
+                        // Load person counts
+                        if (meal.personCounts) {
+                            try {
+                                workflowData.personCounts[dateStr][meal.mealType] = JSON.parse(meal.personCounts);
+                            } catch (e) {
+                                console.error('Error parsing person counts:', e);
+                            }
+                        }
+                    }
+                });
+            });
+
+            // Set form values and show workflow
+            document.getElementById('meal-plan-name').value = mealPlan.name;
+            document.getElementById('workflow-start-date').value = mealPlan.startDate;
+            document.getElementById('workflow-end-date').value = mealPlan.endDate;
+            document.getElementById('workflow-title').textContent = 'Essensplan bearbeiten';
+            document.getElementById('save-meal-plan-btn').textContent = 'Änderungen speichern';
+
+            workflowData.currentDayIndex = 0;
+            document.getElementById('total-days').textContent = workflowData.days.length;
+
+            document.getElementById('meal-planning-workflow').classList.remove('hidden');
+            showWorkflowStep(2);
+            updateDayDisplay();
+        }
+
+        async function deleteMealPlan(mealPlanId) {
+            const mealPlan = allData.find(item => item.id === mealPlanId);
+            if (!mealPlan) return;
+
+            // Show inline confirmation
+            const confirmButton = event.target;
+            const originalText = confirmButton.textContent;
+            confirmButton.textContent = 'Wirklich löschen?';
+            confirmButton.classList.remove('bg-red-600', 'hover:bg-red-700');
+            confirmButton.classList.add('bg-red-800');
+            
+            // Create cancel button
+            const cancelButton = document.createElement('button');
+            cancelButton.textContent = 'Abbrechen';
+            cancelButton.className = 'bg-gray-500 text-white px-3 py-1 rounded hover:bg-gray-600 ml-2';
+            cancelButton.onclick = () => {
+                confirmButton.textContent = originalText;
+                confirmButton.classList.remove('bg-red-800');
+                confirmButton.classList.add('bg-red-600', 'hover:bg-red-700');
+                cancelButton.remove();
+                confirmButton.onclick = () => deleteMealPlan(mealPlanId);
+            };
+            
+            confirmButton.parentNode.insertBefore(cancelButton, confirmButton.nextSibling);
+            
+            confirmButton.onclick = async () => {
+                try {
+                    // Delete all meals for this meal plan
+                    const meals = getMealsForMealPlan(mealPlanId);
+                    for (const meal of meals) {
+                        await window.dataSdk.delete(meal);
+                    }
+
+                    // Delete the meal plan itself
+                    const result = await window.dataSdk.delete(mealPlan);
+                    if (!result.isOk) {
+                        alert('Fehler beim Löschen des Essensplans.');
+                    }
+                } catch (error) {
+                    alert('Fehler beim Löschen des Essensplans: ' + error.message);
+                }
+            };
+        }
+
+        // Shopping functions
+        function renderShoppingPlans() {
+            const shoppingPlans = allData.filter(item => item.type === 'shopping');
+            const container = document.getElementById('shopping-plans');
+            
+            if (shoppingPlans.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-8">
+                        <p class="text-orange-600">Noch keine Einkaufspläne erstellt.</p>
+                        <button onclick="showShoppingPlanForm()" class="mt-4 bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700">Ersten Einkauf planen</button>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = shoppingPlans.map(plan => {
+                const store = allData.find(s => s.id === plan.shoppingStore);
+                const selectedDays = JSON.parse(plan.selectedDays || '[]');
+                const shoppingList = generateShoppingList(selectedDays, plan.shoppingStore);
+                
+                return `
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <h3 class="text-lg font-semibold text-orange-800">${plan.shoppingName || 'Einkaufsplan'}</h3>
+                                <p class="text-orange-600">Einkauf am ${new Date(plan.shoppingDate).toLocaleDateString('de-DE')}</p>
+                                <p class="text-orange-600">${store ? store.storeName : 'Unbekanntes Geschäft'}</p>
+                                <p class="text-sm text-orange-500">Tage: ${selectedDays.join(', ')}</p>
+                            </div>
+                            <div class="flex space-x-2">
+                                <button onclick="exportShoppingListToPDF('${plan.id}')" class="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 text-sm">📄 PDF Export</button>
+                                <button onclick="deleteShoppingPlan('${plan.id}')" class="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700">Löschen</button>
+                            </div>
+                        </div>
+                        
+                        <div class="border-t pt-4">
+                            <h4 class="font-medium text-orange-800 mb-2">Einkaufsliste:</h4>
+                            ${shoppingList.length > 0 ? `
+                                <div class="space-y-2">
+                                    ${shoppingList.map(item => `
+                                        <div class="shopping-item flex items-center justify-between p-2 bg-orange-50 rounded">
+                                            <div class="flex items-center">
+                                                <input type="checkbox" class="mr-3" onchange="toggleShoppingItem(this)">
+                                                <span>${item.quantity} ${item.unit} ${item.name}</span>
+                                            </div>
+                                            <span class="text-xs text-orange-500">${item.recipes.join(', ')}</span>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            ` : '<p class="text-orange-500">Keine Zutaten für dieses Geschäft gefunden.</p>'}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function generateShoppingList(selectedDays, storeId) {
+            const ingredientMap = new Map();
+            
+            selectedDays.forEach(dateStr => {
+                const meals = getMealsForDate(dateStr);
+                
+                meals.forEach(meal => {
+                    const recipe = allData.find(r => r.id === meal.recipeId);
+                    if (!recipe) return;
+                    
+                    const ingredients = JSON.parse(recipe.ingredients || '[]');
+                    
+                    ingredients.forEach(ingredient => {
+                        if (ingredient.stores && ingredient.stores.includes(storeId)) {
+                            const key = `${ingredient.name}_${ingredient.unit}`;
+                            
+                            if (ingredientMap.has(key)) {
+                                const existing = ingredientMap.get(key);
+                                existing.quantity = (parseFloat(existing.quantity) || 0) + (parseFloat(ingredient.quantity) || 0);
+                                existing.recipes.add(recipe.title);
+                            } else {
+                                ingredientMap.set(key, {
+                                    name: ingredient.name,
+                                    quantity: parseFloat(ingredient.quantity) || 0,
+                                    unit: ingredient.unit,
+                                    recipes: new Set([recipe.title])
+                                });
+                            }
+                        }
+                    });
+                });
+            });
+            
+            return Array.from(ingredientMap.values()).map(item => ({
+                ...item,
+                recipes: Array.from(item.recipes)
+            }));
+        }
+
+        function showShoppingPlanForm() {
+            document.getElementById('shopping-plan-form').classList.remove('hidden');
+            populateShoppingStoreOptions();
+            populateDaySelection();
+        }
+
+        function hideShoppingPlanForm() {
+            document.getElementById('shopping-plan-form').classList.add('hidden');
+            document.getElementById('shopping-form').reset();
+        }
+
+        function populateShoppingStoreOptions() {
+            const stores = getStores();
+            const select = document.getElementById('shopping-store');
+            select.innerHTML = '<option value="">Geschäft wählen</option>' +
+                stores.map(store => `<option value="${store.id}">${store.storeName}</option>`).join('');
+        }
+
+        function populateDaySelection() {
+            const container = document.getElementById('day-selection');
+            const days = [];
+            
+            // Get next 21 days
+            for (let i = 0; i < 21; i++) {
+                const date = new Date();
+                date.setDate(date.getDate() + i);
+                days.push(date);
+            }
+            
+            container.innerHTML = days.map(date => {
+                const dateStr = date.toISOString().split('T')[0];
+                const displayDate = date.toLocaleDateString('de-DE', { 
+                    weekday: 'short', 
+                    day: '2-digit', 
+                    month: '2-digit' 
+                });
+                const meals = getMealsForDate(dateStr);
+                const hasRecipes = meals.length > 0;
+                
+                return `
+                    <label class="flex items-center p-2 rounded ${hasRecipes ? 'bg-orange-50' : 'bg-gray-50'}">
+                        <input type="checkbox" value="${dateStr}" class="mr-3" ${!hasRecipes ? 'disabled' : ''}>
+                        <span class="${hasRecipes ? 'text-orange-800' : 'text-gray-400'}">${displayDate}</span>
+                        <span class="ml-2 text-xs ${hasRecipes ? 'text-orange-500' : 'text-gray-400'}">
+                            ${hasRecipes ? `${meals.length} Mahlzeit(en)` : 'Keine Rezepte'}
+                        </span>
+                    </label>
+                `;
+            }).join('');
+        }
+
+        async function saveShoppingPlan(event) {
+            event.preventDefault();
+            
+            if (isLoading) return;
+            isLoading = true;
+            
+            const selectedDays = Array.from(document.querySelectorAll('#day-selection input:checked'))
+                .map(input => input.value);
+            
+            if (selectedDays.length === 0) {
+                alert('Bitte wählen Sie mindestens einen Tag aus.');
+                isLoading = false;
+                return;
+            }
+
+            // Generate automatic name
+            const store = allData.find(s => s.id === document.getElementById('shopping-store').value);
+            const storeName = store ? store.storeName : 'Supermarkt';
+            const startDate = new Date(selectedDays[0]).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
+            const endDate = selectedDays.length > 1 ? new Date(selectedDays[selectedDays.length - 1]).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) : startDate;
+            const autoName = selectedDays.length > 1 ? `${storeName} ${startDate}-${endDate}` : `${storeName} ${startDate}`;
+            
+            const plan = {
+                id: 'shopping_' + Date.now(),
+                type: 'shopping',
+                shoppingName: autoName,
+                shoppingDate: document.getElementById('shopping-date').value,
+                shoppingStore: document.getElementById('shopping-store').value,
+                selectedDays: JSON.stringify(selectedDays),
+                createdAt: new Date().toISOString()
+            };
+            
+            const result = await window.dataSdk.create(plan);
+            
+            isLoading = false;
+            
+            if (result.isOk) {
+                hideShoppingPlanForm();
+            } else {
+                alert('Fehler beim Erstellen des Einkaufsplans.');
+            }
+        }
+
+        async function deleteShoppingPlan(planId) {
+            const plan = allData.find(item => item.id === planId);
+            if (plan) {
+                const result = await window.dataSdk.delete(plan);
+                if (!result.isOk) {
+                    alert('Fehler beim Löschen des Einkaufsplans.');
+                }
+            }
+        }
+
+        function toggleShoppingItem(checkbox) {
+            const item = checkbox.closest('.shopping-item');
+            if (checkbox.checked) {
+                item.classList.add('checked');
+            } else {
+                item.classList.remove('checked');
+            }
+        }
+
+        // Event listeners
+        document.addEventListener('DOMContentLoaded', initApp);
+
+        // Form event listeners
+        document.getElementById('recipe-form').addEventListener('submit', saveRecipe);
+        document.getElementById('store-form').addEventListener('submit', saveStore);
+        document.getElementById('shopping-form').addEventListener('submit', saveShoppingPlan);
+
+        // Date input event listeners for meal planning workflow
+        document.addEventListener('DOMContentLoaded', () => {
+            setTimeout(() => {
+                const startDateInput = document.getElementById('workflow-start-date');
+                const endDateInput = document.getElementById('workflow-end-date');
+                
+                if (startDateInput) {
+                    startDateInput.addEventListener('change', function() {
+                        // Update minimum date for end date when start date changes
+                        endDateInput.min = this.value;
+                        
+                        // If end date is before new start date, update it
+                        if (endDateInput.value && new Date(endDateInput.value) < new Date(this.value)) {
+                            endDateInput.value = this.value;
+                        }
+                    });
+                }
+            }, 100);
+        });
+
+        // Search and filter event listeners
+        document.addEventListener('DOMContentLoaded', () => {
+            setTimeout(() => {
+                const searchInput = document.getElementById('recipe-search');
+                const categoryFilter = document.getElementById('category-filter');
+                const ingredientFilter = document.getElementById('ingredient-filter');
+                
+                if (searchInput) searchInput.addEventListener('input', renderRecipes);
+                if (categoryFilter) categoryFilter.addEventListener('change', renderRecipes);
+                if (ingredientFilter) ingredientFilter.addEventListener('input', renderRecipes);
+            }, 100);
+        });
+
+        // Helper function to find shopping plans related to a meal plan
+        function getShoppingPlansForMealPlan(mealPlan) {
+            const shoppingPlans = allData.filter(item => item.type === 'shopping');
+            const mealPlanStart = new Date(mealPlan.startDate);
+            const mealPlanEnd = new Date(mealPlan.endDate);
+            
+            return shoppingPlans.filter(plan => {
+                if (!plan.selectedDays) return false;
+                
+                try {
+                    const selectedDays = JSON.parse(plan.selectedDays);
+                    return selectedDays.some(dayStr => {
+                        const dayDate = new Date(dayStr);
+                        return dayDate >= mealPlanStart && dayDate <= mealPlanEnd;
+                    });
+                } catch (e) {
+                    return false;
+                }
+            });
+        }
+
+        // Function to toggle shopping list visibility
+        function toggleShoppingListView(listId) {
+            const listElement = document.getElementById(listId);
+            const toggleText = document.getElementById('toggle-text-' + listId.replace('shopping-list-', ''));
+            
+            if (listElement.classList.contains('hidden')) {
+                listElement.classList.remove('hidden');
+                toggleText.textContent = 'Ausblenden ▲';
+            } else {
+                listElement.classList.add('hidden');
+                toggleText.textContent = 'Anzeigen ▼';
+            }
+        }
+
+        // PDF Export Functions
+        function exportMealPlanToPDF(mealPlanId) {
+            const mealPlan = allData.find(item => item.id === mealPlanId);
+            if (!mealPlan) return;
+
+            const meals = getMealsForMealPlan(mealPlanId);
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+
+            // Title
+            doc.setFontSize(20);
+            doc.setFont(undefined, 'bold');
+            doc.text(mealPlan.name, 20, 20);
+
+            // Date range
+            doc.setFontSize(12);
+            doc.setFont(undefined, 'normal');
+            const startDate = new Date(mealPlan.startDate).toLocaleDateString('de-DE');
+            const endDate = new Date(mealPlan.endDate).toLocaleDateString('de-DE');
+            doc.text(`Zeitraum: ${startDate} - ${endDate}`, 20, 30);
+
+            let yPosition = 50;
+
+            // Group meals by date
+            const mealsByDate = {};
+            meals.forEach(meal => {
+                if (!mealsByDate[meal.date]) {
+                    mealsByDate[meal.date] = {};
+                }
+                if (!mealsByDate[meal.date][meal.mealType]) {
+                    mealsByDate[meal.date][meal.mealType] = [];
+                }
+                mealsByDate[meal.date][meal.mealType].push(meal);
+            });
+
+            // Generate calendar view
+            Object.keys(mealsByDate).sort().forEach(dateStr => {
+                const date = new Date(dateStr);
+                const dayName = date.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' });
+
+                // Check if we need a new page
+                if (yPosition > 250) {
+                    doc.addPage();
+                    yPosition = 20;
+                }
+
+                // Day header
+                doc.setFontSize(14);
+                doc.setFont(undefined, 'bold');
+                doc.text(dayName, 20, yPosition);
+                yPosition += 10;
+
+                // Meals for this day
+                mealTypes.forEach(mealType => {
+                    if (mealsByDate[dateStr][mealType]) {
+                        doc.setFontSize(12);
+                        doc.setFont(undefined, 'bold');
+                        doc.text(`${mealType}:`, 25, yPosition);
+                        yPosition += 7;
+
+                        mealsByDate[dateStr][mealType].forEach(meal => {
+                            const recipe = allData.find(r => r.id === meal.recipeId);
+                            if (recipe) {
+                                doc.setFont(undefined, 'normal');
+                                const servingsText = meal.adjustedServings !== recipe.servings ? 
+                                    ` (${meal.adjustedServings} Portionen, angepasst von ${recipe.servings})` : 
+                                    ` (${recipe.servings} Portionen)`;
+                                
+                                const text = `• ${recipe.title}${servingsText}`;
+                                const lines = doc.splitTextToSize(text, 160);
+                                lines.forEach(line => {
+                                    doc.text(line, 30, yPosition);
+                                    yPosition += 5;
+                                });
+
+                                // Person counts if available
+                                if (meal.personCounts) {
+                                    try {
+                                        const counts = JSON.parse(meal.personCounts);
+                                        const totalPersons = Object.values(counts).reduce((sum, count) => sum + count, 0);
+                                        if (totalPersons > 0) {
+                                            doc.setFontSize(10);
+                                            doc.text(`  Personen: ${counts.omnivor}O, ${counts.vegetarian}V, ${counts.vegan}Ve, ${counts.glutenfree}G, ${counts.lactosefree}L`, 30, yPosition);
+                                            yPosition += 5;
+                                            doc.setFontSize(12);
+                                        }
+                                    } catch (e) {
+                                        // Ignore parsing errors
+                                    }
+                                }
+                            }
+                        });
+                        yPosition += 3;
+                    }
+                });
+                yPosition += 5;
+            });
+
+            // Add shopping lists if available
+            const relatedShoppingPlans = getShoppingPlansForMealPlan(mealPlan);
+            if (relatedShoppingPlans.length > 0) {
+                // Check if we need a new page
+                if (yPosition > 200) {
+                    doc.addPage();
+                    yPosition = 20;
+                } else {
+                    yPosition += 10;
+                }
+
+                doc.setFontSize(16);
+                doc.setFont(undefined, 'bold');
+                doc.text('Zugehörige Einkaufslisten', 20, yPosition);
+                yPosition += 15;
+
+                relatedShoppingPlans.forEach(plan => {
+                    const store = allData.find(s => s.id === plan.shoppingStore);
+                    const selectedDays = JSON.parse(plan.selectedDays || '[]');
+                    const shoppingList = generateShoppingList(selectedDays, plan.shoppingStore);
+
+                    doc.setFontSize(14);
+                    doc.setFont(undefined, 'bold');
+                    doc.text(plan.shoppingName, 20, yPosition);
+                    yPosition += 7;
+
+                    doc.setFontSize(10);
+                    doc.setFont(undefined, 'normal');
+                    doc.text(`Einkaufsdatum: ${new Date(plan.shoppingDate).toLocaleDateString('de-DE')}`, 20, yPosition);
+                    yPosition += 5;
+                    doc.text(`Geschäft: ${store ? store.storeName : 'Unbekannt'}`, 20, yPosition);
+                    yPosition += 5;
+                    doc.text(`Tage: ${selectedDays.map(d => new Date(d).toLocaleDateString('de-DE', {day: '2-digit', month: '2-digit'})).join(', ')}`, 20, yPosition);
+                    yPosition += 10;
+
+                    if (shoppingList.length > 0) {
+                        doc.setFontSize(12);
+                        doc.setFont(undefined, 'bold');
+                        doc.text('Einkaufsliste:', 20, yPosition);
+                        yPosition += 7;
+
+                        shoppingList.forEach(item => {
+                            if (yPosition > 280) {
+                                doc.addPage();
+                                yPosition = 20;
+                            }
+                            doc.setFont(undefined, 'normal');
+                            doc.text(`☐ ${item.quantity} ${item.unit} ${item.name}`, 25, yPosition);
+                            yPosition += 6;
+                        });
+                    }
+                    yPosition += 10;
+                });
+            }
+
+            // Save the PDF
+            const fileName = `${mealPlan.name.replace(/[^a-zA-Z0-9]/g, '_')}_Essensplan.pdf`;
+            doc.save(fileName);
+        }
+
+        function exportShoppingListToPDF(shoppingPlanId) {
+            const shoppingPlan = allData.find(item => item.id === shoppingPlanId);
+            if (!shoppingPlan) return;
+
+            const store = allData.find(s => s.id === shoppingPlan.shoppingStore);
+            const selectedDays = JSON.parse(shoppingPlan.selectedDays || '[]');
+            const shoppingList = generateShoppingList(selectedDays, shoppingPlan.shoppingStore);
+
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+
+            // Title
+            doc.setFontSize(20);
+            doc.setFont(undefined, 'bold');
+            doc.text('Einkaufsliste', 20, 20);
+
+            // Shopping plan details
+            doc.setFontSize(14);
+            doc.setFont(undefined, 'bold');
+            doc.text(shoppingPlan.shoppingName || 'Einkaufsplan', 20, 35);
+
+            doc.setFontSize(12);
+            doc.setFont(undefined, 'normal');
+            doc.text(`Einkaufsdatum: ${new Date(shoppingPlan.shoppingDate).toLocaleDateString('de-DE')}`, 20, 45);
+            doc.text(`Geschäft: ${store ? store.storeName : 'Unbekanntes Geschäft'}`, 20, 52);
+            
+            if (store && store.storeAddress) {
+                doc.text(`Adresse: ${store.storeAddress}`, 20, 59);
+            }
+
+            doc.text(`Tage: ${selectedDays.map(d => new Date(d).toLocaleDateString('de-DE', {day: '2-digit', month: '2-digit'})).join(', ')}`, 20, 66);
+
+            let yPosition = 85;
+
+            if (shoppingList.length > 0) {
+                doc.setFontSize(14);
+                doc.setFont(undefined, 'bold');
+                doc.text(`Einkaufsliste (${shoppingList.length} Artikel):`, 20, yPosition);
+                yPosition += 15;
+
+                // Group items by category (optional enhancement)
+                shoppingList.forEach((item, index) => {
+                    if (yPosition > 280) {
+                        doc.addPage();
+                        yPosition = 20;
+                    }
+
+                    // Checkbox
+                    doc.rect(20, yPosition - 4, 4, 4);
+                    
+                    // Item text
+                    doc.setFontSize(12);
+                    doc.setFont(undefined, 'normal');
+                    const itemText = `${item.quantity} ${item.unit} ${item.name}`;
+                    doc.text(itemText, 30, yPosition);
+
+                    // Recipe references (smaller text)
+                    if (item.recipes && item.recipes.length > 0) {
+                        doc.setFontSize(9);
+                        doc.setTextColor(100, 100, 100);
+                        const recipeText = `(${item.recipes.slice(0, 3).join(', ')}${item.recipes.length > 3 ? '...' : ''})`;
+                        doc.text(recipeText, 30, yPosition + 4);
+                        doc.setTextColor(0, 0, 0);
+                    }
+
+                    yPosition += 12;
+                });
+
+                // Add summary
+                yPosition += 10;
+                doc.setFontSize(10);
+                doc.setFont(undefined, 'italic');
+                doc.text(`Erstellt am: ${new Date().toLocaleDateString('de-DE')} um ${new Date().toLocaleTimeString('de-DE')}`, 20, yPosition);
+            } else {
+                doc.setFontSize(12);
+                doc.text('Keine Artikel für dieses Geschäft gefunden.', 20, yPosition);
+            }
+
+            // Save the PDF
+            const fileName = `${shoppingPlan.shoppingName ? shoppingPlan.shoppingName.replace(/[^a-zA-Z0-9]/g, '_') : 'Einkaufsliste'}.pdf`;
+            doc.save(fileName);
+        }
+
+        // Meal Planning Workflow Functions
+        function startMealPlanningWorkflow() {
+            // Reset workflow data
+            workflowData = {
+                startDate: null,
+                endDate: null,
+                days: [],
+                currentDayIndex: 0,
+                currentMealIndex: 0,
+                selectedRecipes: {},
+                personCounts: {},
+                currentMealType: null,
+                editingMealPlan: null,
+                shoppingLists: []
+            };
+
+            // Set default dates (today + 7 days)
+            const today = new Date();
+            const nextWeek = new Date(today);
+            nextWeek.setDate(today.getDate() + 6);
+
+            // Set minimum date to today for both date inputs
+            const todayStr = today.toISOString().split('T')[0];
+            document.getElementById('workflow-start-date').min = todayStr;
+            document.getElementById('workflow-end-date').min = todayStr;
+            
+            document.getElementById('workflow-start-date').value = todayStr;
+            document.getElementById('workflow-end-date').value = nextWeek.toISOString().split('T')[0];
+            document.getElementById('meal-plan-name').value = '';
+            document.getElementById('workflow-title').textContent = 'Neuer Essensplan erstellen';
+            document.getElementById('save-meal-plan-btn').textContent = 'Essensplan speichern';
+
+            // Show workflow modal
+            document.getElementById('meal-planning-workflow').classList.remove('hidden');
+            showWorkflowStep(1);
+        }
+
+        function closeMealPlanningWorkflow() {
+            document.getElementById('meal-planning-workflow').classList.add('hidden');
+        }
+
+        function showWorkflowStep(stepNumber) {
+            // Hide all steps
+            for (let i = 1; i <= 4; i++) {
+                document.getElementById(`workflow-step-${i}`).classList.add('hidden');
+            }
+            document.getElementById('workflow-recipe-selection').classList.add('hidden');
+
+            // Show selected step
+            document.getElementById(`workflow-step-${stepNumber}`).classList.remove('hidden');
+        }
+
+        function proceedToStep2() {
+            const startDate = document.getElementById('workflow-start-date').value;
+            const endDate = document.getElementById('workflow-end-date').value;
+            const mealPlanName = document.getElementById('meal-plan-name').value;
+
+            if (!startDate || !endDate) {
+                alert('Bitte wählen Sie Start- und Enddatum aus.');
+                return;
+            }
+
+            if (!mealPlanName.trim()) {
+                alert('Bitte geben Sie einen Namen für den Essensplan ein.');
+                return;
+            }
+
+            // Check if start date is not in the past
+            const today = new Date();
+            today.setHours(0, 0, 0, 0); // Reset time to start of day for comparison
+            const selectedStartDate = new Date(startDate);
+            
+            if (selectedStartDate < today) {
+                alert('Das Startdatum darf nicht in der Vergangenheit liegen. Bitte wählen Sie das heutige Datum oder ein zukünftiges Datum.');
+                return;
+            }
+
+            if (new Date(startDate) > new Date(endDate)) {
+                alert('Das Startdatum muss vor dem Enddatum liegen.');
+                return;
+            }
+
+            // Calculate days
+            workflowData.startDate = new Date(startDate);
+            workflowData.endDate = new Date(endDate);
+            workflowData.days = [];
+
+            const current = new Date(workflowData.startDate);
+            while (current <= workflowData.endDate) {
+                workflowData.days.push(new Date(current));
+                current.setDate(current.getDate() + 1);
+            }
+
+            // Initialize selected recipes and person counts for each day
+            workflowData.days.forEach(day => {
+                const dateStr = day.toISOString().split('T')[0];
+                
+                // Always initialize the structure, even when editing
+                if (!workflowData.selectedRecipes[dateStr]) {
+                    workflowData.selectedRecipes[dateStr] = {
+                        'Frühstück': [],
+                        'Mittagessen': [],
+                        'Abendessen': [],
+                        'Nachtisch': []
+                    };
+                }
+                
+                if (!workflowData.personCounts[dateStr]) {
+                    workflowData.personCounts[dateStr] = {
+                        'Frühstück': { omnivor: 0, vegetarian: 0, vegan: 0, glutenfree: 0, lactosefree: 0 },
+                        'Mittagessen': { omnivor: 0, vegetarian: 0, vegan: 0, glutenfree: 0, lactosefree: 0 },
+                        'Abendessen': { omnivor: 0, vegetarian: 0, vegan: 0, glutenfree: 0, lactosefree: 0 },
+                        'Nachtisch': { omnivor: 0, vegetarian: 0, vegan: 0, glutenfree: 0, lactosefree: 0 }
+                    };
+                }
+            });
+
+            workflowData.currentDayIndex = 0;
+            document.getElementById('total-days').textContent = workflowData.days.length;
+
+            showWorkflowStep(2);
+            updateDayDisplay();
+        }
+
+        function updateDayDisplay() {
+            const currentDay = workflowData.days[workflowData.currentDayIndex];
+            const dateStr = currentDay.toISOString().split('T')[0];
+
+            document.getElementById('current-day-number').textContent = workflowData.currentDayIndex + 1;
+            document.getElementById('current-date-display').textContent = 
+                currentDay.toLocaleDateString('de-DE', { 
+                    weekday: 'long', 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric' 
+                });
+
+            // Update meal displays - fix container IDs
+            const mealContainerMap = {
+                'Frühstück': 'breakfast-recipes',
+                'Mittagessen': 'lunch-recipes', 
+                'Abendessen': 'dinner-recipes',
+                'Nachtisch': 'dessert-recipes'
+            };
+
+            mealTypes.forEach(mealType => {
+                const containerId = mealContainerMap[mealType];
+                const container = document.getElementById(containerId);
+                
+                // Ensure data structure exists
+                if (!workflowData.selectedRecipes[dateStr]) {
+                    workflowData.selectedRecipes[dateStr] = {
+                        'Frühstück': [],
+                        'Mittagessen': [],
+                        'Abendessen': []
+                    };
+                }
+                
+                const selectedRecipes = workflowData.selectedRecipes[dateStr][mealType] || [];
+                console.log(`Displaying recipes for ${dateStr} ${mealType} in container ${containerId}:`, selectedRecipes);
+
+                if (container) {
+                    if (selectedRecipes.length > 0) {
+                        container.innerHTML = selectedRecipes.map(recipeId => {
+                            if (recipeId === 'no-recipe') {
+                                return `
+                                    <div class="bg-gray-100 rounded p-2 text-sm flex justify-between items-center">
+                                        <span class="italic text-gray-600">ohne</span>
+                                        <button onclick="removeRecipeFromMeal('${dateStr}', '${mealType}', '${recipeId}')" class="text-red-600 hover:text-red-800 text-xs">×</button>
+                                    </div>
+                                `;
+                            }
+                            const recipe = allData.find(r => r.id === recipeId);
+                            if (!recipe) {
+                                console.warn(`Recipe not found: ${recipeId}`);
+                                return '';
+                            }
+                            return `
+                                <div class="bg-orange-100 rounded p-2 text-sm flex justify-between items-center">
+                                    <span>${recipe.title}</span>
+                                    <button onclick="removeRecipeFromMeal('${dateStr}', '${mealType}', '${recipeId}')" class="text-red-600 hover:text-red-800 text-xs">×</button>
+                                </div>
+                            `;
+                        }).filter(html => html !== '').join('');
+                    } else {
+                        container.innerHTML = '<div class="text-gray-500 text-sm italic">Noch keine Rezepte ausgewählt</div>';
+                    }
+                } else {
+                    console.error(`Container not found: ${containerId}`);
+                }
+
+                // Update missing tags display - fix tag container IDs
+                const missingTags = getMissingTagsForMeal(dateStr, mealType);
+                const tagContainerMap = {
+                    'Frühstück': 'breakfast-missing-tags',
+                    'Mittagessen': 'lunch-missing-tags',
+                    'Abendessen': 'dinner-missing-tags',
+                    'Nachtisch': 'dessert-missing-tags'
+                };
+                const missingTagsId = tagContainerMap[mealType];
+                const missingTagsElement = document.getElementById(missingTagsId);
+                if (missingTagsElement) {
+                    if (mealType === 'Nachtisch') {
+                        missingTagsElement.textContent = 'Optional - keine Tags erforderlich';
+                    } else {
+                        missingTagsElement.textContent = missingTags.join(', ') || 'Alle Tags abgedeckt ✓';
+                    }
+                } else {
+                    console.error(`Missing tags container not found: ${missingTagsId}`);
+                }
+            });
+
+            // Update dessert button state based on "no-recipe" selection
+            updateDessertButtonState(dateStr);
+
+            // Update navigation buttons
+            document.getElementById('prev-day-btn').disabled = workflowData.currentDayIndex === 0;
+            document.getElementById('next-day-btn').textContent = 
+                workflowData.currentDayIndex === workflowData.days.length - 1 ? 'Weiter zu Schritt 3 →' : 'Nächster Tag →';
+        }
+
+        function getMissingTagsForMeal(dateStr, mealType) {
+            const selectedRecipes = workflowData.selectedRecipes[dateStr][mealType] || [];
+            const coveredTags = new Set();
+
+            // Collect all tags from all selected recipes for this meal
+            selectedRecipes.forEach(recipeId => {
+                const recipe = allData.find(r => r.id === recipeId);
+                if (recipe && recipe.tags) {
+                    const recipeTags = recipe.tags.split(',').map(tag => tag.trim());
+                    recipeTags.forEach(tag => {
+                        if (requiredTags.includes(tag)) {
+                            coveredTags.add(tag);
+                        }
+                    });
+                }
+            });
+
+            return requiredTags.filter(tag => !coveredTags.has(tag));
+        }
+
+        function selectRecipeForMeal(mealType) {
+            const currentDay = workflowData.days[workflowData.currentDayIndex];
+            const dateStr = currentDay.toISOString().split('T')[0];
+            
+            // Check if dessert button is disabled
+            if (mealType === 'Nachtisch') {
+                const dessertRecipes = workflowData.selectedRecipes[dateStr]['Nachtisch'] || [];
+                if (dessertRecipes.includes('no-recipe')) {
+                    return; // Don't allow recipe selection if "no-recipe" is selected
+                }
+            }
+            
+            workflowData.currentMealType = mealType;
+            
+            // Show recipe selection
+            document.getElementById('workflow-step-2').classList.add('hidden');
+            document.getElementById('workflow-recipe-selection').classList.remove('hidden');
+            document.getElementById('current-meal-type').textContent = mealType;
+
+            // Update missing tags display
+            const missingTags = getMissingTagsForMeal(dateStr, mealType);
+            document.getElementById('missing-tags-display').textContent = missingTags.join(', ') || 'Alle Tags abgedeckt';
+
+            // Populate recipe grid
+            const recipes = getRecipes();
+            const grid = document.getElementById('workflow-recipe-grid');
+            
+            grid.innerHTML = recipes.map(recipe => {
+                const recipeTags = recipe.tags ? recipe.tags.split(',').map(tag => tag.trim()) : [];
+                const hasRequiredTag = recipeTags.some(tag => missingTags.includes(tag));
+                const isRecommended = hasRequiredTag && missingTags.length > 0;
+
+                return `
+                    <div class="bg-white border ${isRecommended ? 'border-green-400 bg-green-50' : 'border-orange-200'} rounded-lg p-3 cursor-pointer hover:bg-orange-50" 
+                         onclick="addRecipeToWorkflowMeal('${recipe.id}')">
+                        ${isRecommended ? '<div class="text-xs text-green-600 font-medium mb-1">✓ Empfohlen</div>' : ''}
+                        <h4 class="font-medium text-orange-800">${recipe.title}</h4>
+                        <p class="text-sm text-orange-600">${recipe.category} • ${recipe.cookTime} Min</p>
+                        ${recipe.tags ? `<p class="text-xs text-orange-500 mt-1">Tags: ${recipe.tags}</p>` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function addRecipeToWorkflowMeal(recipeId) {
+            const currentDay = workflowData.days[workflowData.currentDayIndex];
+            const dateStr = currentDay.toISOString().split('T')[0];
+            const mealType = workflowData.currentMealType;
+
+            // Ensure the data structure exists
+            if (!workflowData.selectedRecipes[dateStr]) {
+                workflowData.selectedRecipes[dateStr] = {
+                    'Frühstück': [],
+                    'Mittagessen': [],
+                    'Abendessen': [],
+                    'Nachtisch': []
+                };
+            }
+
+            if (!workflowData.selectedRecipes[dateStr][mealType]) {
+                workflowData.selectedRecipes[dateStr][mealType] = [];
+            }
+
+            // Add recipe if not already selected
+            if (!workflowData.selectedRecipes[dateStr][mealType].includes(recipeId)) {
+                workflowData.selectedRecipes[dateStr][mealType].push(recipeId);
+                console.log(`Added recipe ${recipeId} to ${dateStr} ${mealType}`, workflowData.selectedRecipes[dateStr][mealType]);
+            }
+
+            // Go back to day display
+            document.getElementById('workflow-recipe-selection').classList.add('hidden');
+            document.getElementById('workflow-step-2').classList.remove('hidden');
+            updateDayDisplay();
+        }
+
+        function addNoRecipeToMeal(mealType) {
+            const currentDay = workflowData.days[workflowData.currentDayIndex];
+            const dateStr = currentDay.toISOString().split('T')[0];
+
+            // Ensure the data structure exists
+            if (!workflowData.selectedRecipes[dateStr]) {
+                workflowData.selectedRecipes[dateStr] = {
+                    'Frühstück': [],
+                    'Mittagessen': [],
+                    'Abendessen': [],
+                    'Nachtisch': []
+                };
+            }
+
+            if (!workflowData.selectedRecipes[dateStr][mealType]) {
+                workflowData.selectedRecipes[dateStr][mealType] = [];
+            }
+
+            // Add "no-recipe" if not already selected
+            if (!workflowData.selectedRecipes[dateStr][mealType].includes('no-recipe')) {
+                workflowData.selectedRecipes[dateStr][mealType].push('no-recipe');
+                console.log(`Added no-recipe to ${dateStr} ${mealType}`, workflowData.selectedRecipes[dateStr][mealType]);
+            }
+
+            updateDayDisplay();
+        }
+
+        function removeRecipeFromMeal(dateStr, mealType, recipeId) {
+            const recipes = workflowData.selectedRecipes[dateStr][mealType];
+            const index = recipes.indexOf(recipeId);
+            if (index > -1) {
+                recipes.splice(index, 1);
+            }
+            updateDayDisplay();
+        }
+
+        function updateDessertButtonState(dateStr) {
+            const dessertRecipes = workflowData.selectedRecipes[dateStr]['Nachtisch'] || [];
+            const hasNoRecipe = dessertRecipes.includes('no-recipe');
+            const addRecipeBtn = document.getElementById('dessert-add-recipe-btn');
+            
+            if (addRecipeBtn) {
+                if (hasNoRecipe) {
+                    // Disable and gray out the button
+                    addRecipeBtn.disabled = true;
+                    addRecipeBtn.classList.remove('bg-orange-500', 'hover:bg-orange-600');
+                    addRecipeBtn.classList.add('bg-gray-300', 'cursor-not-allowed');
+                    addRecipeBtn.textContent = '+ Rezept hinzufügen (deaktiviert)';
+                } else {
+                    // Enable the button
+                    addRecipeBtn.disabled = false;
+                    addRecipeBtn.classList.remove('bg-gray-300', 'cursor-not-allowed');
+                    addRecipeBtn.classList.add('bg-orange-500', 'hover:bg-orange-600');
+                    addRecipeBtn.textContent = '+ Rezept hinzufügen';
+                }
+            }
+        }
+
+        function cancelRecipeSelection() {
+            document.getElementById('workflow-recipe-selection').classList.add('hidden');
+            document.getElementById('workflow-step-2').classList.remove('hidden');
+        }
+
+        function previousDay() {
+            if (workflowData.currentDayIndex > 0) {
+                workflowData.currentDayIndex--;
+                updateDayDisplay();
+            }
+        }
+
+        function nextDay() {
+            if (workflowData.currentDayIndex < workflowData.days.length - 1) {
+                workflowData.currentDayIndex++;
+                updateDayDisplay();
+            } else {
+                // Proceed to step 3
+                proceedToStep3();
+            }
+        }
+
+        function proceedToStep3() {
+            // Check if all meals have at least one recipe (except Nachtisch which is optional)
+            let hasIncompleteDay = false;
+            workflowData.days.forEach(day => {
+                const dateStr = day.toISOString().split('T')[0];
+                mealTypes.forEach(mealType => {
+                    // Nachtisch is optional, so skip validation for it
+                    if (mealType !== 'Nachtisch' && workflowData.selectedRecipes[dateStr][mealType].length === 0) {
+                        hasIncompleteDay = true;
+                    }
+                });
+            });
+
+            if (hasIncompleteDay) {
+                alert('Bitte wählen Sie für jeden Tag und jede Hauptmahlzeit (Frühstück, Mittagessen, Abendessen) mindestens ein Rezept aus. Nachtisch ist optional.');
+                return;
+            }
+
+            workflowData.currentDayIndex = 0;
+            workflowData.currentMealIndex = 0;
+            showWorkflowStep(3);
+            updatePersonConfigDisplay();
+        }
+
+        function updatePersonConfigDisplay() {
+            // Skip meals with "no-recipe" for dessert
+            skipNoRecipeMeals();
+
+            const currentDay = workflowData.days[workflowData.currentDayIndex];
+            const dateStr = currentDay.toISOString().split('T')[0];
+            const mealType = mealTypes[workflowData.currentMealIndex];
+
+            document.getElementById('person-config-date').textContent = 
+                `${currentDay.toLocaleDateString('de-DE')} - ${mealType}`;
+
+            // Load current person counts or use previous meal's counts as default
+            const counts = workflowData.personCounts[dateStr][mealType];
+            const defaultCounts = getPreviousMealCounts();
+            
+            document.getElementById('omnivor-count').value = counts.omnivor || defaultCounts.omnivor;
+            document.getElementById('vegetarian-count').value = counts.vegetarian || defaultCounts.vegetarian;
+            document.getElementById('vegan-count').value = counts.vegan || defaultCounts.vegan;
+            document.getElementById('glutenfree-count').value = counts.glutenfree || defaultCounts.glutenfree;
+            document.getElementById('lactosefree-count').value = counts.lactosefree || defaultCounts.lactosefree;
+
+            // Update the actual counts with defaults if they were 0
+            if (Object.values(counts).every(count => count === 0)) {
+                workflowData.personCounts[dateStr][mealType] = { ...defaultCounts };
+            }
+
+            // Show selected recipes for this meal
+            const selectedRecipes = workflowData.selectedRecipes[dateStr][mealType];
+            const recipesContainer = document.getElementById('person-config-recipes');
+            
+            recipesContainer.innerHTML = selectedRecipes.map(recipeId => {
+                if (recipeId === 'no-recipe') {
+                    return `
+                        <div class="flex justify-between items-center p-2 bg-gray-50 rounded">
+                            <span class="italic text-gray-600">ohne</span>
+                            <span class="text-sm text-gray-500">Keine Personenkonfiguration erforderlich</span>
+                        </div>
+                    `;
+                }
+                const recipe = allData.find(r => r.id === recipeId);
+                return recipe ? `
+                    <div class="flex justify-between items-center p-2 bg-orange-50 rounded">
+                        <span>${recipe.title} (${recipe.servings} Portionen)</span>
+                        <span class="text-sm text-orange-600">${recipe.tags || 'Keine Tags'}</span>
+                    </div>
+                ` : '';
+            }).join('');
+
+            // Update navigation buttons
+            const isFirst = workflowData.currentDayIndex === 0 && workflowData.currentMealIndex === 0;
+            const isLast = workflowData.currentDayIndex === workflowData.days.length - 1 && 
+                          workflowData.currentMealIndex === mealTypes.length - 1;
+
+            document.getElementById('prev-meal-btn').disabled = isFirst;
+            document.getElementById('next-meal-btn').textContent = isLast ? 'Weiter zu Zusammenfassung →' : 'Nächste Mahlzeit →';
+        }
+
+        function getPreviousMealCounts() {
+            // Try to find the previous meal's person counts to use as default
+            let prevDayIndex = workflowData.currentDayIndex;
+            let prevMealIndex = workflowData.currentMealIndex - 1;
+
+            // If we're at the first meal of the day, go to the last meal of the previous day
+            if (prevMealIndex < 0) {
+                prevDayIndex--;
+                prevMealIndex = mealTypes.length - 1;
+            }
+
+            // Look for previous meals with actual person counts
+            while (prevDayIndex >= 0) {
+                const prevDay = workflowData.days[prevDayIndex];
+                if (prevDay) {
+                    const prevDateStr = prevDay.toISOString().split('T')[0];
+                    
+                    // Check meals from current meal index backwards
+                    for (let mealIdx = prevMealIndex; mealIdx >= 0; mealIdx--) {
+                        const prevMealType = mealTypes[mealIdx];
+                        const prevCounts = workflowData.personCounts[prevDateStr]?.[prevMealType];
+                        
+                        if (prevCounts && Object.values(prevCounts).some(count => count > 0)) {
+                            // Skip dessert meals with "no-recipe"
+                            const prevRecipes = workflowData.selectedRecipes[prevDateStr]?.[prevMealType] || [];
+                            if (prevMealType === 'Nachtisch' && prevRecipes.includes('no-recipe')) {
+                                continue;
+                            }
+                            return prevCounts;
+                        }
+                    }
+                }
+                
+                // Move to previous day
+                prevDayIndex--;
+                prevMealIndex = mealTypes.length - 1;
+            }
+
+            // Default values if no previous meal found
+            return { omnivor: 2, vegetarian: 0, vegan: 0, glutenfree: 0, lactosefree: 0 };
+        }
+
+        function skipNoRecipeMeals() {
+            // Skip meals that have "no-recipe" (only for dessert)
+            let currentDay = workflowData.days[workflowData.currentDayIndex];
+            let currentMealType = mealTypes[workflowData.currentMealIndex];
+            let dateStr = currentDay.toISOString().split('T')[0];
+            
+            while (currentDay && currentMealType) {
+                const selectedRecipes = workflowData.selectedRecipes[dateStr]?.[currentMealType] || [];
+                
+                // If this is a dessert with "no-recipe", skip it
+                if (currentMealType === 'Nachtisch' && selectedRecipes.includes('no-recipe')) {
+                    // Move to next meal
+                    if (workflowData.currentMealIndex < mealTypes.length - 1) {
+                        workflowData.currentMealIndex++;
+                    } else if (workflowData.currentDayIndex < workflowData.days.length - 1) {
+                        workflowData.currentDayIndex++;
+                        workflowData.currentMealIndex = 0;
+                    } else {
+                        // We've reached the end
+                        break;
+                    }
+                    
+                    // Update variables for next iteration
+                    currentDay = workflowData.days[workflowData.currentDayIndex];
+                    currentMealType = mealTypes[workflowData.currentMealIndex];
+                    if (currentDay) {
+                        dateStr = currentDay.toISOString().split('T')[0];
+                    }
+                } else {
+                    // Found a meal that needs person configuration
+                    break;
+                }
+            }
+        }
+
+        function previousMealConfig() {
+            // Save current person counts
+            saveCurrentPersonCounts();
+
+            // Move to previous meal, skipping "no-recipe" desserts
+            do {
+                if (workflowData.currentMealIndex > 0) {
+                    workflowData.currentMealIndex--;
+                } else if (workflowData.currentDayIndex > 0) {
+                    workflowData.currentDayIndex--;
+                    workflowData.currentMealIndex = mealTypes.length - 1;
+                } else {
+                    break; // Can't go further back
+                }
+
+                const currentDay = workflowData.days[workflowData.currentDayIndex];
+                const dateStr = currentDay.toISOString().split('T')[0];
+                const mealType = mealTypes[workflowData.currentMealIndex];
+                const selectedRecipes = workflowData.selectedRecipes[dateStr]?.[mealType] || [];
+                
+                // Stop if this meal doesn't have "no-recipe" or isn't a dessert
+                if (!(mealType === 'Nachtisch' && selectedRecipes.includes('no-recipe'))) {
+                    break;
+                }
+            } while (true);
+
+            updatePersonConfigDisplay();
+        }
+
+        function nextMealConfig() {
+            // Save current person counts
+            saveCurrentPersonCounts();
+
+            // Move to next meal, skipping "no-recipe" desserts
+            do {
+                if (workflowData.currentMealIndex < mealTypes.length - 1) {
+                    workflowData.currentMealIndex++;
+                } else if (workflowData.currentDayIndex < workflowData.days.length - 1) {
+                    workflowData.currentDayIndex++;
+                    workflowData.currentMealIndex = 0;
+                } else {
+                    // Proceed to step 4
+                    showWorkflowStep(4);
+                    generateWorkflowSummary();
+                    return;
+                }
+
+                const currentDay = workflowData.days[workflowData.currentDayIndex];
+                const dateStr = currentDay.toISOString().split('T')[0];
+                const mealType = mealTypes[workflowData.currentMealIndex];
+                const selectedRecipes = workflowData.selectedRecipes[dateStr]?.[mealType] || [];
+                
+                // Stop if this meal doesn't have "no-recipe" or isn't a dessert
+                if (!(mealType === 'Nachtisch' && selectedRecipes.includes('no-recipe'))) {
+                    break;
+                }
+            } while (workflowData.currentDayIndex < workflowData.days.length);
+
+            // Check if we've gone through all meals
+            if (workflowData.currentDayIndex >= workflowData.days.length) {
+                showWorkflowStep(4);
+                generateWorkflowSummary();
+                return;
+            }
+
+            updatePersonConfigDisplay();
+        }
+
+        function saveCurrentPersonCounts() {
+            const currentDay = workflowData.days[workflowData.currentDayIndex];
+            const dateStr = currentDay.toISOString().split('T')[0];
+            const mealType = mealTypes[workflowData.currentMealIndex];
+
+            workflowData.personCounts[dateStr][mealType] = {
+                omnivor: parseInt(document.getElementById('omnivor-count').value) || 0,
+                vegetarian: parseInt(document.getElementById('vegetarian-count').value) || 0,
+                vegan: parseInt(document.getElementById('vegan-count').value) || 0,
+                glutenfree: parseInt(document.getElementById('glutenfree-count').value) || 0,
+                lactosefree: parseInt(document.getElementById('lactosefree-count').value) || 0
+            };
+        }
+
+        function generateWorkflowSummary() {
+            const summaryContainer = document.getElementById('workflow-summary');
+            
+            let summaryHTML = '';
+            workflowData.days.forEach(day => {
+                const dateStr = day.toISOString().split('T')[0];
+                summaryHTML += `
+                    <div class="border border-orange-200 rounded-lg p-4">
+                        <h5 class="font-medium text-orange-800 mb-3">${day.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })}</h5>
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                `;
+
+                mealTypes.forEach(mealType => {
+                    const recipes = workflowData.selectedRecipes[dateStr][mealType];
+                    const counts = workflowData.personCounts[dateStr][mealType];
+                    const totalPersons = Object.values(counts).reduce((sum, count) => sum + count, 0);
+
+                    summaryHTML += `
+                        <div class="bg-orange-50 p-3 rounded">
+                            <h6 class="font-medium text-orange-700 mb-2">${mealType}</h6>
+                            <div class="text-sm space-y-1">
+                                ${recipes.map(recipeId => {
+                                    if (recipeId === 'no-recipe') {
+                                        return `<div>• <span class="italic text-gray-600">ohne</span></div>`;
+                                    }
+                                    const recipe = allData.find(r => r.id === recipeId);
+                                    if (!recipe) return '';
+                                    
+                                    const scaleFactor = totalPersons / recipe.servings;
+                                    const adjustedServings = Math.ceil(totalPersons);
+                                    
+                                    return `<div>• ${recipe.title} (${adjustedServings} Portionen)</div>`;
+                                }).join('')}
+                                <div class="text-xs text-orange-600 mt-2">
+                                    Personen: ${totalPersons > 0 ? `${counts.omnivor}O, ${counts.vegetarian}V, ${counts.vegan}Ve, ${counts.glutenfree}G, ${counts.lactosefree}L` : 'Keine Personen'}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                summaryHTML += `
+                        </div>
+                    </div>
+                `;
+            });
+
+            summaryContainer.innerHTML = summaryHTML;
+            
+            // Update shopping lists display
+            updateWorkflowShoppingListsDisplay();
+        }
+
+        function backToPersonConfig() {
+            showWorkflowStep(3);
+        }
+
+        // Shopping Lists Management in Workflow
+        function addShoppingListToWorkflow() {
+            document.getElementById('shopping-creation-dialog').classList.remove('hidden');
+            
+            // Populate stores
+            const storeSelect = document.getElementById('shopping-store-select');
+            const stores = getStores();
+            storeSelect.innerHTML = '<option value="">Bitte Supermarkt wählen</option>' +
+                stores.map(store => `<option value="${store.id}">${store.storeName}</option>`).join('');
+
+            // Populate all available days from the meal plan
+            const daysContainer = document.getElementById('shopping-days-selection');
+            
+            daysContainer.innerHTML = workflowData.days.map(day => {
+                const dateStr = day.toISOString().split('T')[0];
+                const displayDate = day.toLocaleDateString('de-DE', { 
+                    weekday: 'short', 
+                    day: '2-digit', 
+                    month: '2-digit' 
+                });
+                const dayRecipes = workflowData.selectedRecipes[dateStr];
+                const totalRecipes = Object.values(dayRecipes).flat().filter(id => id !== 'no-recipe').length;
+                
+                return `
+                    <label class="flex items-center p-2 rounded ${totalRecipes > 0 ? 'bg-orange-50' : 'bg-gray-50'}">
+                        <input type="checkbox" value="${dateStr}" class="mr-3" ${totalRecipes === 0 ? 'disabled' : ''}>
+                        <span class="${totalRecipes > 0 ? 'text-orange-800' : 'text-gray-400'}">${displayDate}</span>
+                        <span class="ml-2 text-xs ${totalRecipes > 0 ? 'text-orange-500' : 'text-gray-400'}">
+                            ${totalRecipes > 0 ? `${totalRecipes} Rezept(e)` : 'Keine Rezepte'}
+                        </span>
+                    </label>
+                `;
+            }).join('');
+        }
+
+        function createShoppingListFromWorkflow() {
+            const selectedStore = document.getElementById('shopping-store-select').value;
+            const selectedDays = Array.from(document.querySelectorAll('#shopping-days-selection input:checked'))
+                .map(input => input.value);
+
+            if (!selectedStore) {
+                alert('Bitte wählen Sie einen Supermarkt aus.');
+                return;
+            }
+
+            if (selectedDays.length === 0) {
+                alert('Bitte wählen Sie mindestens einen Tag aus.');
+                return;
+            }
+
+            // Generate automatic name
+            const store = allData.find(s => s.id === selectedStore);
+            const storeName = store ? store.storeName : 'Supermarkt';
+            const startDate = new Date(selectedDays[0]).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
+            const endDate = selectedDays.length > 1 ? new Date(selectedDays[selectedDays.length - 1]).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) : startDate;
+            const autoName = selectedDays.length > 1 ? `${storeName} ${startDate}-${endDate}` : `${storeName} ${startDate}`;
+
+            // Add to workflow shopping lists
+            const shoppingListConfig = {
+                id: 'temp_shopping_' + Date.now(),
+                name: autoName,
+                storeId: selectedStore,
+                storeName: storeName,
+                selectedDays: selectedDays,
+                shoppingDate: new Date().toISOString().split('T')[0] // Default to today
+            };
+
+            workflowData.shoppingLists.push(shoppingListConfig);
+
+            // Close dialog and update display
+            document.getElementById('shopping-creation-dialog').classList.add('hidden');
+            updateWorkflowShoppingListsDisplay();
+        }
+
+        function updateWorkflowShoppingListsDisplay() {
+            const container = document.getElementById('workflow-shopping-lists');
+            
+            if (workflowData.shoppingLists.length === 0) {
+                container.innerHTML = '<p class="text-blue-600 text-sm italic">Noch keine Einkaufslisten hinzugefügt.</p>';
+                return;
+            }
+
+            container.innerHTML = workflowData.shoppingLists.map((shoppingList, index) => {
+                // Generate preview of shopping list items
+                const shoppingItems = generateShoppingListFromWorkflowData(shoppingList.selectedDays, shoppingList.storeId);
+                
+                return `
+                    <div class="bg-white border border-blue-200 rounded-lg p-3">
+                        <div class="flex justify-between items-start mb-2">
+                            <div>
+                                <h5 class="font-medium text-blue-800">${shoppingList.name}</h5>
+                                <p class="text-sm text-blue-600">
+                                    📅 ${new Date(shoppingList.shoppingDate).toLocaleDateString('de-DE')} • 
+                                    🏪 ${shoppingList.storeName}
+                                </p>
+                                <p class="text-xs text-blue-500">
+                                    Tage: ${shoppingList.selectedDays.map(d => new Date(d).toLocaleDateString('de-DE', {day: '2-digit', month: '2-digit'})).join(', ')}
+                                </p>
+                            </div>
+                            <div class="flex space-x-2">
+                                <button onclick="editWorkflowShoppingList(${index})" class="text-blue-600 hover:text-blue-800 text-sm">✏️</button>
+                                <button onclick="removeWorkflowShoppingList(${index})" class="text-red-600 hover:text-red-800 text-sm">🗑️</button>
+                            </div>
+                        </div>
+                        
+                        <div class="text-xs text-blue-600">
+                            <strong>${shoppingItems.length} Artikel:</strong> 
+                            ${shoppingItems.slice(0, 3).map(item => `${item.name}`).join(', ')}${shoppingItems.length > 3 ? '...' : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function generateShoppingListFromWorkflowData(selectedDays, storeId) {
+            const ingredientMap = new Map();
+            
+            selectedDays.forEach(dateStr => {
+                mealTypes.forEach(mealType => {
+                    const recipes = workflowData.selectedRecipes[dateStr][mealType] || [];
+                    
+                    recipes.forEach(recipeId => {
+                        if (recipeId === 'no-recipe') return;
+                        
+                        const recipe = allData.find(r => r.id === recipeId);
+                        if (!recipe) return;
+                        
+                        const ingredients = JSON.parse(recipe.ingredients || '[]');
+                        const counts = workflowData.personCounts[dateStr][mealType];
+                        const totalPersons = Object.values(counts).reduce((sum, count) => sum + count, 0);
+                        const scaleFactor = totalPersons > 0 ? totalPersons / recipe.servings : 1;
+                        
+                        ingredients.forEach(ingredient => {
+                            if (ingredient.stores && ingredient.stores.includes(storeId)) {
+                                const key = `${ingredient.name}_${ingredient.unit}`;
+                                const adjustedQuantity = (parseFloat(ingredient.quantity) || 0) * scaleFactor;
+                                
+                                if (ingredientMap.has(key)) {
+                                    const existing = ingredientMap.get(key);
+                                    existing.quantity += adjustedQuantity;
+                                    existing.recipes.add(recipe.title);
+                                } else {
+                                    ingredientMap.set(key, {
+                                        name: ingredient.name,
+                                        quantity: adjustedQuantity,
+                                        unit: ingredient.unit,
+                                        recipes: new Set([recipe.title])
+                                    });
+                                }
+                            }
+                        });
+                    });
+                });
+            });
+            
+            return Array.from(ingredientMap.values()).map(item => ({
+                ...item,
+                recipes: Array.from(item.recipes)
+            }));
+        }
+
+        function editWorkflowShoppingList(index) {
+            const shoppingList = workflowData.shoppingLists[index];
+            
+            // Pre-fill the dialog with existing data
+            document.getElementById('shopping-store-select').value = shoppingList.storeId;
+            
+            // Check the appropriate days
+            const checkboxes = document.querySelectorAll('#shopping-days-selection input[type="checkbox"]');
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = shoppingList.selectedDays.includes(checkbox.value);
+            });
+            
+            // Remove the current shopping list and show dialog
+            workflowData.shoppingLists.splice(index, 1);
+            document.getElementById('shopping-creation-dialog').classList.remove('hidden');
+        }
+
+        function removeWorkflowShoppingList(index) {
+            workflowData.shoppingLists.splice(index, 1);
+            updateWorkflowShoppingListsDisplay();
+        }
+
+        async function saveMealPlan() {
+            if (isLoading) return;
+            isLoading = true;
+
+            try {
+                // Get meal plan name from the workflow
+                const mealPlanName = document.getElementById('meal-plan-name').value;
+                if (!mealPlanName.trim()) {
+                    alert('Bitte geben Sie einen Namen für den Essensplan ein.');
+                    isLoading = false;
+                    return;
+                }
+
+                let mealPlanId;
+                
+                if (workflowData.editingMealPlan) {
+                    // Update existing meal plan
+                    const updatedMealPlan = {
+                        ...workflowData.editingMealPlan,
+                        name: mealPlanName.trim(),
+                        startDate: workflowData.startDate.toISOString().split('T')[0],
+                        endDate: workflowData.endDate.toISOString().split('T')[0]
+                    };
+
+                    const mealPlanResult = await window.dataSdk.update(updatedMealPlan);
+                    if (!mealPlanResult.isOk) {
+                        throw new Error('Fehler beim Aktualisieren des Essensplans');
+                    }
+
+                    mealPlanId = workflowData.editingMealPlan.id;
+
+                    // Delete existing meals for this meal plan
+                    const existingMeals = getMealsForMealPlan(mealPlanId);
+                    for (const meal of existingMeals) {
+                        await window.dataSdk.delete(meal);
+                    }
+                } else {
+                    // Create new meal plan
+                    mealPlanId = 'mealplan_' + Date.now();
+                    const mealPlan = {
+                        id: mealPlanId,
+                        type: 'mealplan',
+                        name: mealPlanName.trim(),
+                        startDate: workflowData.startDate.toISOString().split('T')[0],
+                        endDate: workflowData.endDate.toISOString().split('T')[0],
+                        createdAt: new Date().toISOString()
+                    };
+
+                    const mealPlanResult = await window.dataSdk.create(mealPlan);
+                    if (!mealPlanResult.isOk) {
+                        throw new Error('Fehler beim Speichern des Essensplans');
+                    }
+                }
+
+                // Save all meals with person counts and adjusted servings
+                for (const day of workflowData.days) {
+                    const dateStr = day.toISOString().split('T')[0];
+                    
+                    for (const mealType of mealTypes) {
+                        const recipes = workflowData.selectedRecipes[dateStr][mealType];
+                        const counts = workflowData.personCounts[dateStr][mealType];
+                        const totalPersons = Object.values(counts).reduce((sum, count) => sum + count, 0);
+
+                        for (const recipeId of recipes) {
+                            let adjustedServings, originalServings;
+                            
+                            if (recipeId === 'no-recipe') {
+                                adjustedServings = 0;
+                                originalServings = 0;
+                            } else {
+                                const recipe = allData.find(r => r.id === recipeId);
+                                if (!recipe) continue;
+                                adjustedServings = totalPersons > 0 ? Math.ceil(totalPersons) : recipe.servings;
+                                originalServings = recipe.servings;
+                            }
+
+                            const meal = {
+                                id: 'meal_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+                                type: 'meal',
+                                mealPlanId: mealPlanId,
+                                date: dateStr,
+                                mealType: mealType,
+                                recipeId: recipeId,
+                                originalServings: originalServings,
+                                adjustedServings: adjustedServings,
+                                personCounts: JSON.stringify(counts),
+                                createdAt: new Date().toISOString()
+                            };
+
+                            const result = await window.dataSdk.create(meal);
+                            if (!result.isOk) {
+                                throw new Error('Fehler beim Speichern der Mahlzeit');
+                            }
+                        }
+                    }
+                }
+
+                // Save shopping lists
+                for (const shoppingListConfig of workflowData.shoppingLists) {
+                    const shoppingPlan = {
+                        id: 'shopping_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+                        type: 'shopping',
+                        shoppingName: shoppingListConfig.name,
+                        shoppingDate: shoppingListConfig.shoppingDate,
+                        shoppingStore: shoppingListConfig.storeId,
+                        selectedDays: JSON.stringify(shoppingListConfig.selectedDays),
+                        createdAt: new Date().toISOString()
+                    };
+
+                    const shoppingResult = await window.dataSdk.create(shoppingPlan);
+                    if (!shoppingResult.isOk) {
+                        console.error('Fehler beim Speichern der Einkaufsliste:', shoppingListConfig.name);
+                    }
+                }
+
+                // Show success confirmation dialog
+                const successMessage = workflowData.editingMealPlan ? 
+                    'Essensplan erfolgreich aktualisiert!' : 
+                    `Essensplan erfolgreich erstellt! ${workflowData.shoppingLists.length > 0 ? `${workflowData.shoppingLists.length} Einkaufsliste(n) wurden ebenfalls erstellt.` : ''}`;
+                
+                showSuccessConfirmation(successMessage);
+                
+                // Close workflow and show meal plans section
+                closeMealPlanningWorkflow();
+                showSection('mealplans');
+
+            } catch (error) {
+                alert('Fehler beim Speichern des Essensplans: ' + error.message);
+            } finally {
+                isLoading = false;
+            }
+        }
+
+        // Success confirmation dialog functions
+        function showSuccessConfirmation(message) {
+            document.getElementById('success-message').textContent = message;
+            
+            // Update description based on action
+            const description = document.querySelector('#success-confirmation-dialog p');
+            if (message.includes('aktualisiert')) {
+                description.textContent = 'Ihre Änderungen wurden erfolgreich gespeichert und sind nun in der Übersicht sichtbar.';
+            } else {
+                description.textContent = 'Ihr Essensplan wurde erfolgreich erstellt und ist nun in der Übersicht verfügbar.';
+            }
+            
+            document.getElementById('success-confirmation-dialog').classList.remove('hidden');
+        }
+
+        function closeSuccessConfirmation() {
+            document.getElementById('success-confirmation-dialog').classList.add('hidden');
+        }
+
+        // Shopping creation dialog functions
+        function showShoppingCreationDialog() {
+            // Populate stores
+            const storeSelect = document.getElementById('shopping-store-select');
+            const stores = getStores();
+            storeSelect.innerHTML = '<option value="">Bitte Supermarkt wählen</option>' +
+                stores.map(store => `<option value="${store.id}">${store.storeName}</option>`).join('');
+
+            // Populate available days (from current day onwards)
+            const daysContainer = document.getElementById('shopping-days-selection');
+            const availableDays = workflowData.days.slice(workflowData.currentDayIndex);
+            
+            daysContainer.innerHTML = availableDays.map((day, index) => {
+                const dateStr = day.toISOString().split('T')[0];
+                const displayDate = day.toLocaleDateString('de-DE', { 
+                    weekday: 'short', 
+                    day: '2-digit', 
+                    month: '2-digit' 
+                });
+                const dayRecipes = workflowData.selectedRecipes[dateStr];
+                const totalRecipes = Object.values(dayRecipes).flat().length;
+                
+                return `
+                    <label class="flex items-center p-2 rounded ${totalRecipes > 0 ? 'bg-orange-50' : 'bg-gray-50'}">
+                        <input type="checkbox" value="${dateStr}" class="mr-3" ${totalRecipes === 0 ? 'disabled' : ''} ${index === 0 ? 'checked' : ''}>
+                        <span class="${totalRecipes > 0 ? 'text-orange-800' : 'text-gray-400'}">${displayDate}</span>
+                        <span class="ml-2 text-xs ${totalRecipes > 0 ? 'text-orange-500' : 'text-gray-400'}">
+                            ${totalRecipes > 0 ? `${totalRecipes} Rezept(e)` : 'Keine Rezepte'}
+                        </span>
+                    </label>
+                `;
+            }).join('');
+
+            document.getElementById('shopping-creation-dialog').classList.remove('hidden');
+        }
+
+        function cancelShoppingCreation() {
+            document.getElementById('shopping-creation-dialog').classList.add('hidden');
+            document.getElementById('create-shopping-list').checked = false;
+        }
+
+        async function createShoppingListFromWorkflow() {
+            const selectedStore = document.getElementById('shopping-store-select').value;
+            const selectedDays = Array.from(document.querySelectorAll('#shopping-days-selection input:checked'))
+                .map(input => input.value);
+
+            if (!selectedStore) {
+                alert('Bitte wählen Sie einen Supermarkt aus.');
+                return;
+            }
+
+            if (selectedDays.length === 0) {
+                alert('Bitte wählen Sie mindestens einen Tag aus.');
+                return;
+            }
+
+            if (isLoading) return;
+            isLoading = true;
+
+            try {
+                // Get store name for automatic naming
+                const store = allData.find(s => s.id === selectedStore);
+                const storeName = store ? store.storeName : 'Supermarkt';
+                const startDate = new Date(selectedDays[0]).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
+                const endDate = selectedDays.length > 1 ? new Date(selectedDays[selectedDays.length - 1]).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) : startDate;
+                const autoName = selectedDays.length > 1 ? `${storeName} ${startDate}-${endDate}` : `${storeName} ${startDate}`;
+
+                // Create shopping plan with workflow data
+                const plan = {
+                    id: 'shopping_' + Date.now(),
+                    type: 'shopping',
+                    shoppingName: autoName,
+                    shoppingDate: new Date().toISOString().split('T')[0], // Today as shopping date
+                    shoppingStore: selectedStore,
+                    selectedDays: JSON.stringify(selectedDays),
+                    createdAt: new Date().toISOString()
+                };
+
+                const result = await window.dataSdk.create(plan);
+                
+                if (result.isOk) {
+                    document.getElementById('shopping-creation-dialog').classList.add('hidden');
+                    document.getElementById('create-shopping-list').checked = false;
+                    
+                    // Continue with next day or step 3
+                    if (workflowData.currentDayIndex < workflowData.days.length - 1) {
+                        workflowData.currentDayIndex++;
+                        updateDayDisplay();
+                    } else {
+                        proceedToStep3();
+                    }
+                } else {
+                    alert('Fehler beim Erstellen der Einkaufsliste.');
+                }
+            } catch (error) {
+                alert('Fehler beim Erstellen der Einkaufsliste: ' + error.message);
+            } finally {
+                isLoading = false;
+            }
+        }
+    </script>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'998e3d88e5f69131',t:'MTc2MjE5Nzc0Ni4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
